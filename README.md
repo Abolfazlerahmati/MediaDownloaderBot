@@ -35,7 +35,8 @@ Then follow [docs/telegram-setup.md](docs/telegram-setup.md) and
 | --- | --- |
 | Local development and tests | [docs/local-development.md](docs/local-development.md) |
 | Deployment (Docker, systemd, reverse proxy) | [docs/deployment.md](docs/deployment.md) |
-| Cloudflare Workers + Containers + D1 (implemented; remote deploy not verified) | [docs/cloudflare.md](docs/cloudflare.md) |
+| Cloudflare Workers + Containers + D1 (Workers Paid plan; not deployed) | [docs/cloudflare.md](docs/cloudflare.md) |
+| Free Cloudflare account: own machine + Cloudflare Tunnel + webhook (not run live) | [docs/cloudflare-free.md](docs/cloudflare-free.md) |
 | Telegram bot setup | [docs/telegram-setup.md](docs/telegram-setup.md) |
 | Group privacy mode | [docs/group-privacy-mode.md](docs/group-privacy-mode.md) |
 | Administrator setup | [docs/admin-setup.md](docs/admin-setup.md) |

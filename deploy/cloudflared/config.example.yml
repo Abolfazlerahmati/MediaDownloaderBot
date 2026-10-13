@@ -1,0 +1,16 @@
+# Cloudflare Tunnel ingress for MediaDownloaderBot on a Cloudflare FREE account.
+#
+# Copy this file to deploy/cloudflared/config.yml and replace the placeholders:
+#   TUNNEL_UUID   the id printed by `cloudflared tunnel create mediabot`
+#   bot.example.com  a hostname in a zone (domain) that you manage in Cloudflare
+#
+# Only the Telegram webhook path is published. Everything else (including the admin panel)
+# returns 404 at the edge AND is not routed to the app at all.
+tunnel: TUNNEL_UUID
+credentials-file: /etc/cloudflared/TUNNEL_UUID.json
+
+ingress:
+  - hostname: bot.example.com
+    path: ^/telegram/webhook$
+    service: http://app:8080
+  - service: http_status:404

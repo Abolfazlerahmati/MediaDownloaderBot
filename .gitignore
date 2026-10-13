@@ -26,3 +26,7 @@ build/
 dist/
 node_modules/
 .wrangler/
+# Tunnel credentials and the local ingress config (contain secrets / your hostname)
+deploy/cloudflared/config.yml
+deploy/cloudflared/*.json
+deploy/cloudflared/cert.pem

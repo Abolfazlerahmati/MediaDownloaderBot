@@ -1,5 +1,8 @@
 # Running on Cloudflare (Workers + Containers + D1)
 
+> **Paid plan only.** Cloudflare Containers requires the **Workers Paid** plan. On a free account, use
+> [cloudflare-free.md](cloudflare-free.md) instead (your own machine + Cloudflare Tunnel + SQLite).
+
 > **Status: implemented, partly verified.**
 > - Verified locally: the Python D1 client, the migrations and repositories (against an in-process fake bridge
 >   and against the real Worker code running under `wrangler dev` with its D1 emulator), the webhook mode, the

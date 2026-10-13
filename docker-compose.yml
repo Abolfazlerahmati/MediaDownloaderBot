@@ -22,3 +22,23 @@ services:
       - ALL
     pids_limit: 256
     mem_limit: 2g
+
+  # Optional: public HTTPS for Telegram webhooks on a Cloudflare FREE account (no Workers plan needed).
+  # Start with:  docker compose --profile tunnel up -d
+  # Requires deploy/cloudflared/config.yml and the tunnel credentials file (see docs/cloudflare-free.md).
+  # Only /telegram/webhook is routed to the app; all other paths get 404 from cloudflared.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.0
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    depends_on:
+      - app
+    volumes:
+      - ./deploy/cloudflared:/etc/cloudflared:ro
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 256m
