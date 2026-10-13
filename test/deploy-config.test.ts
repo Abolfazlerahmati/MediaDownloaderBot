@@ -27,9 +27,21 @@ describe('free-plan deploy configuration', () => {
     expect(toml).not.toMatch(/\[vars\]/);
   });
 
-  it('ships the D1 migration and the Workers Builds script', () => {
-    expect(existsSync(join(root, 'migrations', '0001_init.sql'))).toBe(true);
-    expect(existsSync(join(root, 'scripts', 'workers-build.sh'))).toBe(true);
+  it('ships the reference schema without the superseded tables', () => {
+    const sql = readFileSync(join(root, 'migrations', '0001_init.sql'), 'utf8');
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS panel_users/);
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS user_prefs/);
+    expect(sql).not.toMatch(/bot_users|download_jobs/);
+  });
+
+  it('serves the panel assets and runs the hourly maintenance cron', () => {
+    expect(toml).toMatch(/\[assets\][\s\S]*directory = "\.\/public"[\s\S]*binding = "ASSETS"/);
+    expect(toml).toMatch(/\[triggers\][\s\S]*crons = \["0 \* \* \* \*"\]/);
+    expect(existsSync(join(root, 'public', 'static', 'app.js'))).toBe(true);
+  });
+
+  it('keeps the build out of the repository (no build script to maintain)', () => {
+    expect(existsSync(join(root, 'scripts', 'workers-build.sh'))).toBe(false);
   });
 
   it('has no Python project files left', () => {

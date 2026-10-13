@@ -1,74 +1,95 @@
-// Worker entry point. Routes:
-//   GET  /                     plain-text status (no secrets)
-//   GET  /health               JSON status for uptime checks
-//   POST /telegram/webhook     Telegram updates; requires the secret token header
+// Worker entry point: routes the webhook, the admin panel pages, the JSON API, static assets, and the hourly cron.
 import type { Env } from './env';
-import { handleUpdate, productionDeps, type TelegramUpdate } from './bot';
-import { d1Store } from './db';
-import { MAX_WEBHOOK_BYTES } from './limits';
+import { ensureSchema, type Db } from './db/schema';
+import { getSettings, pruneOldRows } from './db/store';
+import { handleWebhook } from './webhook';
+import { handleApi } from './web/api';
+import { currentAuth } from './web/session';
+import { shell, type PageName } from './web/pages';
+import { apiError, html, json, redirect } from './web/http';
+import { WEBHOOK_PATH } from './web/bot-admin';
 
-const SECRET_HEADER = 'x-telegram-bot-api-secret-token';
+const PAGES: Record<string, PageName> = {
+  '/': 'dashboard',
+  '/settings': 'settings',
+  '/platforms': 'platforms',
+  '/bot': 'bot',
+  '/logs': 'logs',
+  '/diagnostics': 'diagnostics',
+  '/account': 'account',
+  '/login': 'login',
+};
 
-export function timingSafeEqual(a: string, b: string): boolean {
-  const encoder = new TextEncoder();
-  const x = encoder.encode(a);
-  const y = encoder.encode(b);
-  let diff = x.length ^ y.length;
-  const length = Math.max(x.length, y.length);
-  for (let i = 0; i < length; i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
-  return diff === 0;
-}
+async function handlePage(request: Request, env: Env, db: Db, now: number, path: string): Promise<Response> {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return apiError(405, 'method_not_allowed', 'Use GET.');
+  const page = PAGES[path];
+  if (!page) return html('<!doctype html><meta charset="utf-8"><title>Not found</title><p>Not found.</p>', 404);
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-}
-
-export async function handleWebhook(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-  if (!env.WEBHOOK_SECRET || !env.BOT_TOKEN) {
-    console.error(JSON.stringify({ event: 'config_missing' }));
-    return json({ ok: false, error: 'server_not_configured' }, 500);
+  const auth = await currentAuth(db, request, now);
+  if (page === 'login') {
+    if (auth) return redirect('/');
+    return html(shell({ page: 'login' }));
   }
-  const provided = request.headers.get(SECRET_HEADER) ?? '';
-  if (!timingSafeEqual(provided, env.WEBHOOK_SECRET)) {
-    return json({ ok: false, error: 'forbidden' }, 403);
-  }
-
-  const declared = Number(request.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > MAX_WEBHOOK_BYTES) {
-    return json({ ok: false, error: 'payload_too_large' }, 413);
-  }
-  const text = await request.text();
-  if (text.length > MAX_WEBHOOK_BYTES) return json({ ok: false, error: 'payload_too_large' }, 413);
-
-  let update: TelegramUpdate;
-  try {
-    update = JSON.parse(text) as TelegramUpdate;
-  } catch {
-    return json({ ok: false, error: 'bad_json' }, 400);
-  }
-
-  // Answer Telegram quickly and do the slow work after the response is sent.
-  ctx.waitUntil(
-    handleUpdate(update, productionDeps(env.BOT_TOKEN, d1Store(env.DB))).catch((error: unknown) => {
-      const name = error instanceof Error ? error.name : 'unknown';
-      console.error(JSON.stringify({ event: 'update_crashed', name }));
+  if (!auth) return redirect('/login');
+  const mustChange = auth.user.must_change_password === 1;
+  if (mustChange && page !== 'account') return redirect('/account');
+  return html(
+    shell({
+      page,
+      csrf: auth.csrf,
+      theme: auth.user.appearance_theme,
+      mode: auth.user.appearance_mode,
+      restricted: mustChange,
     }),
   );
-  return json({ ok: true });
 }
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const { pathname } = new URL(request.url);
-    if (request.method === 'GET' && pathname === '/') {
-      return new Response('MediaDownloaderBot is running.', { headers: { 'content-type': 'text/plain; charset=utf-8' } });
+    const url = new URL(request.url);
+    const path = url.pathname;
+    try {
+      if (path === WEBHOOK_PATH) {
+        if (request.method !== 'POST') return apiError(405, 'method_not_allowed', 'Use POST.');
+        return await handleWebhook(request, env, ctx);
+      }
+      if (path === '/health' && request.method === 'GET') {
+        return json({ ok: true, service: 'mediadownloaderbot' });
+      }
+      if (path.startsWith('/static/')) {
+        if (!env.ASSETS || (request.method !== 'GET' && request.method !== 'HEAD')) return apiError(404, 'not_found', 'Not found.');
+        return env.ASSETS.fetch(request);
+      }
+
+      const now = Date.now();
+      try {
+        await ensureSchema(env.DB, now);
+      } catch {
+        return apiError(503, 'database_unavailable', 'The database is not ready. Check the D1 binding in the Cloudflare dashboard.');
+      }
+
+      if (path.startsWith('/api/')) {
+        return await handleApi({ env, db: env.DB, request, url, now });
+      }
+      return await handlePage(request, env, env.DB, now, path);
+    } catch (error) {
+      const name = error instanceof Error ? error.name : 'unknown';
+      console.error(JSON.stringify({ event: 'request_failed', name }));
+      return apiError(500, 'internal', 'Something went wrong. The details were written to the log without secrets.');
     }
-    if (request.method === 'GET' && pathname === '/health') {
-      return json({ ok: true, service: 'mediadownloaderbot' });
-    }
-    if (request.method === 'POST' && pathname === '/telegram/webhook') {
-      return handleWebhook(request, env, ctx);
-    }
-    return json({ ok: false, error: 'not_found' }, 404);
+  },
+
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      (async () => {
+        const now = Date.now();
+        await ensureSchema(env.DB, now);
+        const settings = await getSettings(env.DB);
+        await pruneOldRows(env.DB, now, settings.log_retention_days);
+      })().catch((error: unknown) => {
+        const name = error instanceof Error ? error.name : 'unknown';
+        console.error(JSON.stringify({ event: 'maintenance_failed', name }));
+      }),
+    );
   },
 } satisfies ExportedHandler<Env>;

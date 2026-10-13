@@ -1,6 +1,6 @@
 # MediaDownloaderBot on Cloudflare Workers (free plan: no Containers, no Durable Objects).
-# Secrets are NOT stored here. Set them with `wrangler secret put` or in Workers Builds
-# (Settings > Variables and Secrets), never in this file:
+# Secrets are NOT stored here. Set them in the Cloudflare dashboard (Workers & Pages > mediadownloaderbot >
+# Settings > Variables and secrets, type "Secret"), never in this file:
 #   BOT_TOKEN       Telegram bot token from @BotFather
 #   WEBHOOK_SECRET  any random string (>= 32 chars); Telegram echoes it in each webhook call
 name = 'mediadownloaderbot'
@@ -18,3 +18,12 @@ database_id = "cb32937c-110c-4621-a236-0f7f6a8b7b2f"
 [[kv_namespaces]]
 binding = "CACHE"
 id = "c22c95c3c6ae40a88fbcd4d52c8a5471"
+
+# Static files for the admin panel (public/static/app.css and app.js).
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Hourly maintenance: prunes old logs (per the retention setting), rate and dedupe rows, and expired sessions.
+[triggers]
+crons = ["0 * * * *"]

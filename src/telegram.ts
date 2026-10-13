@@ -1,4 +1,6 @@
-// Minimal Telegram Bot API client. It uses only the methods this bot needs.
+// Minimal Telegram Bot API client. Errors never include the token.
+import { buildMultipart } from './media/multipart';
+
 const API_BASE = 'https://api.telegram.org';
 
 export class TelegramError extends Error {
@@ -7,7 +9,6 @@ export class TelegramError extends Error {
     readonly status: number,
     readonly description: string,
   ) {
-    // Never include the token. Only the method name and Telegram's description are kept.
     super(`telegram ${method} failed: ${status} ${description}`);
     this.name = 'TelegramError';
   }
@@ -19,78 +20,75 @@ interface ApiEnvelope<T> {
   description?: string;
 }
 
+async function parseEnvelope<T>(method: string, res: Response): Promise<T> {
+  const data = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
+  if (!res.ok || !data?.ok) throw new TelegramError(method, res.status, (data?.description ?? 'no response body').slice(0, 300));
+  return data.result as T;
+}
+
 export async function callTelegram<T>(token: string, method: string, payload: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}/bot${token}/${method}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(payload ?? {}),
+  }).catch(() => {
+    throw new TelegramError(method, 0, 'network error');
   });
-  const data = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
-  if (!res.ok || !data?.ok) {
-    throw new TelegramError(method, res.status, data?.description ?? 'no response body');
-  }
-  return data.result as T;
+  return parseEnvelope<T>(method, res);
 }
 
-export function sendMessage(token: string, chatId: number, text: string): Promise<unknown> {
-  return callTelegram(token, 'sendMessage', { chat_id: chatId, text, disable_web_page_preview: true });
+export interface BotInfo {
+  id: number;
+  username?: string;
+  first_name?: string;
 }
 
-export interface MultipartPlan {
-  body: ReadableStream<Uint8Array>;
-  boundary: string;
+export function getMe(token: string): Promise<BotInfo> {
+  return callTelegram<BotInfo>(token, 'getMe', {});
 }
 
-const encoder = new TextEncoder();
-
-/** Removes characters that would break the Content-Disposition header. */
-export function safeFilename(name: string): string {
-  return name.replace(/["\\\r\n]/g, '_').slice(0, 120) || 'video.mp4';
+export interface WebhookInfo {
+  url: string;
+  pending_update_count?: number;
+  last_error_message?: string;
+  last_error_date?: number;
 }
 
-/**
- * Builds a multipart/form-data body that streams `file` without buffering it.
- * Telegram accepts the request without a Content-Length header, so the length is not declared.
- */
-export function buildMultipart(
-  fields: Record<string, string>,
-  file: { name: string; contentType: string; body: ReadableStream<Uint8Array> },
-): MultipartPlan {
-  const boundary = `----mediabot${crypto.randomUUID().replace(/-/g, '')}`;
-  let head = '';
-  for (const [key, value] of Object.entries(fields)) {
-    head += `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`;
-  }
-  head += `--${boundary}\r\nContent-Disposition: form-data; name="video"; filename="${safeFilename(file.name)}"\r\n`;
-  head += `Content-Type: ${file.contentType}\r\n\r\n`;
-  const tail = `\r\n--${boundary}--\r\n`;
+export function getWebhookInfo(token: string): Promise<WebhookInfo> {
+  return callTelegram<WebhookInfo>(token, 'getWebhookInfo', {});
+}
 
-  const reader = file.body.getReader();
-  const headBytes = encoder.encode(head);
-  const tailBytes = encoder.encode(tail);
-  let sentHead = false;
-  const body = new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      if (!sentHead) {
-        sentHead = true;
-        controller.enqueue(headBytes);
-        return;
-      }
-      const { done, value } = await reader.read();
-      if (done) {
-        controller.enqueue(tailBytes);
-        controller.close();
-        return;
-      }
-      controller.enqueue(value);
-    },
-    async cancel(reason) {
-      await reader.cancel(reason).catch(() => undefined);
-    },
+export function setWebhook(token: string, url: string, secret: string): Promise<boolean> {
+  return callTelegram<boolean>(token, 'setWebhook', {
+    url,
+    secret_token: secret,
+    allowed_updates: ['message', 'callback_query'],
+    drop_pending_updates: false,
   });
-  return { body, boundary };
 }
 
+export function deleteWebhook(token: string): Promise<boolean> {
+  return callTelegram<boolean>(token, 'deleteWebhook', { drop_pending_updates: false });
+}
+
+export interface InlineKeyboard {
+  inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+}
+
+export function sendMessage(token: string, chatId: number, text: string, replyMarkup?: InlineKeyboard): Promise<unknown> {
+  return callTelegram(token, 'sendMessage', {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: true,
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+  });
+}
+
+export function answerCallbackQuery(token: string, callbackId: string, text?: string): Promise<unknown> {
+  return callTelegram(token, 'answerCallbackQuery', { callback_query_id: callbackId, ...(text ? { text } : {}) });
+}
+
+/** Streams the video as multipart. Telegram receives the bytes as they arrive from the source. */
 export async function sendVideoStream(
   token: string,
   chatId: number,
@@ -99,14 +97,13 @@ export async function sendVideoStream(
 ): Promise<void> {
   const fields: Record<string, string> = { chat_id: String(chatId), supports_streaming: 'true' };
   if (caption) fields.caption = caption.slice(0, 1024);
-  const plan = buildMultipart(fields, file);
+  const plan = buildMultipart(fields, { fieldName: 'video', ...file });
   const res = await fetch(`${API_BASE}/bot${token}/sendVideo`, {
     method: 'POST',
     headers: { 'content-type': `multipart/form-data; boundary=${plan.boundary}` },
     body: plan.body,
+  }).catch(() => {
+    throw new TelegramError('sendVideo', 0, 'network error');
   });
-  const data = (await res.json().catch(() => null)) as ApiEnvelope<unknown> | null;
-  if (!res.ok || !data?.ok) {
-    throw new TelegramError('sendVideo', res.status, data?.description ?? 'no response body');
-  }
+  await parseEnvelope('sendVideo', res);
 }

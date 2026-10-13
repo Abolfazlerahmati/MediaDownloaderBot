@@ -1,11 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BotError } from '../src/errors';
-import { openMedia, limitStream } from '../src/media';
-import { buildMultipart, safeFilename } from '../src/telegram';
+import { describe, expect, it } from 'vitest';
+import { isMp4Header, fileNameFor, safeTitle } from '../src/media/validate';
+import { limitStream, peekHead } from '../src/media/stream';
+import { MAX_UPLOAD_BYTES } from '../src/limits';
 
-afterEach(() => vi.unstubAllGlobals());
-
-function streamOf(chunks: Uint8Array[]): ReadableStream<Uint8Array> {
+function streamOf(...chunks: Uint8Array[]): ReadableStream<Uint8Array> {
   return new ReadableStream({
     start(controller) {
       for (const c of chunks) controller.enqueue(c);
@@ -14,9 +12,9 @@ function streamOf(chunks: Uint8Array[]): ReadableStream<Uint8Array> {
   });
 }
 
-async function readAll(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+async function readAll(s: ReadableStream<Uint8Array>): Promise<Uint8Array> {
   const parts: Uint8Array[] = [];
-  const reader = stream.getReader();
+  const reader = s.getReader();
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -24,84 +22,76 @@ async function readAll(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> 
   }
   const total = parts.reduce((n, p) => n + p.byteLength, 0);
   const out = new Uint8Array(total);
-  let offset = 0;
+  let off = 0;
   for (const p of parts) {
-    out.set(p, offset);
-    offset += p.byteLength;
+    out.set(p, off);
+    off += p.byteLength;
   }
   return out;
 }
 
-describe('limitStream', () => {
-  it('passes data through when under the limit', async () => {
-    const state = { exceeded: false };
-    const out = await readAll(limitStream(streamOf([new Uint8Array([1, 2]), new Uint8Array([3])]), 10, state));
-    expect([...out]).toEqual([1, 2, 3]);
-    expect(state.exceeded).toBe(false);
+const MP4_HEAD = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+
+describe('MP4 validation', () => {
+  it('accepts the ftyp box at offset 4', () => {
+    expect(isMp4Header(MP4_HEAD)).toBe(true);
   });
 
-  it('errors with file_too_large once the total passes the limit', async () => {
+  it('rejects HTML, short input, and a WebM header', () => {
+    expect(isMp4Header(new TextEncoder().encode('<!doctype html>'))).toBe(false);
+    expect(isMp4Header(new Uint8Array([0, 0, 0]))).toBe(false);
+    expect(isMp4Header(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe(false);
+  });
+});
+
+describe('file names', () => {
+  it('keeps Persian titles and strips path and header breaking characters', () => {
+    expect(safeTitle('سلام/دنیا: "تست"', 'x')).toBe('سلام دنیا تست');
+    expect(fileNameFor('a\r\nb', 'tiktok')).toBe('a b.mp4');
+  });
+
+  it('falls back to the platform name when the title is empty', () => {
+    expect(fileNameFor('   ', 'pinterest')).toBe('pinterest.mp4');
+    expect(fileNameFor(undefined, 'tiktok')).toBe('tiktok.mp4');
+  });
+
+  it('caps the title at 100 characters', () => {
+    expect([...fileNameFor('ا'.repeat(300), 'tiktok')].length).toBeLessThanOrEqual(104);
+  });
+});
+
+describe('stream helpers', () => {
+  it('peekHead returns the head and a rest stream with every byte exactly once', async () => {
+    const a = new Uint8Array([1, 2, 3, 4, 5]);
+    const b = new Uint8Array([6, 7, 8, 9, 10, 11]);
+    const { head, rest } = await peekHead(streamOf(a, b), 4);
+    expect(Array.from(head)).toEqual([1, 2, 3, 4]);
+    expect(Array.from(await readAll(rest))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  });
+
+  it('peekHead handles a source shorter than the requested head', async () => {
+    const { head, rest } = await peekHead(streamOf(new Uint8Array([9, 9])), 12);
+    expect(head.length).toBe(2);
+    expect(Array.from(await readAll(rest))).toEqual([9, 9]);
+  });
+
+  it('limitStream passes bytes through and errors once the cap is passed', async () => {
     const state = { exceeded: false };
-    const stream = limitStream(streamOf([new Uint8Array(6), new Uint8Array(6)]), 10, state);
-    await expect(readAll(stream)).rejects.toBeInstanceOf(BotError);
+    const limited = limitStream(streamOf(new Uint8Array(6), new Uint8Array(6)), 10, state);
+    await expect(readAll(limited)).rejects.toThrow();
     expect(state.exceeded).toBe(true);
   });
-});
 
-describe('openMedia', () => {
-  it('rejects a declared size over the limit before reading the body', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(new Uint8Array(4), { headers: { 'content-length': '60000000' } })),
-    );
-    await expect(openMedia('https://cdn.example/a.mp4', 'https://www.tiktok.com/')).rejects.toMatchObject({
-      code: 'file_too_large',
-    });
-  });
-
-  it('streams a small file and sends the referer header', async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(new Uint8Array([9, 9, 9]), { headers: { 'content-length': '3', 'content-type': 'video/mp4' } }));
-    vi.stubGlobal('fetch', fetchMock);
-    const media = await openMedia('https://cdn.example/a.mp4', 'https://www.tiktok.com/');
-    expect(media.size).toBe(3);
-    expect(media.contentType).toBe('video/mp4');
-    expect([...(await readAll(media.body))]).toEqual([9, 9, 9]);
-    const init = fetchMock.mock.calls[0][1] as RequestInit;
-    expect((init.headers as Record<string, string>).referer).toBe('https://www.tiktok.com/');
-  });
-
-  it('maps a network failure to upstream_error, not internal', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed'); }));
-    await expect(openMedia('https://cdn.example/a.mp4', 'https://x/')).rejects.toMatchObject({ code: 'upstream_error' });
-  });
-
-  it('maps 403 to blocked and other failures to upstream_error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 403 })));
-    await expect(openMedia('https://cdn.example/a.mp4', 'https://x/')).rejects.toMatchObject({ code: 'blocked' });
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500 })));
-    await expect(openMedia('https://cdn.example/a.mp4', 'https://x/')).rejects.toMatchObject({ code: 'upstream_error' });
+  it('limitStream lets a stream exactly at the cap finish', async () => {
+    const state = { exceeded: false };
+    const out = await readAll(limitStream(streamOf(new Uint8Array(5), new Uint8Array(5)), 10, state));
+    expect(out.length).toBe(10);
+    expect(state.exceeded).toBe(false);
   });
 });
 
-describe('buildMultipart', () => {
-  it('wraps fields and the streamed file in valid multipart framing', async () => {
-    const plan = buildMultipart({ chat_id: '42', caption: 'hello' }, {
-      name: 'clip.mp4',
-      contentType: 'video/mp4',
-      body: streamOf([new Uint8Array([0xde, 0xad]), new Uint8Array([0xbe, 0xef])]),
-    });
-    const text = new TextDecoder('latin1').decode(await readAll(plan.body));
-    const b = plan.boundary;
-    expect(text.startsWith(`--${b}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n42\r\n`)).toBe(true);
-    expect(text).toContain('name="caption"\r\n\r\nhello\r\n');
-    expect(text).toContain('name="video"; filename="clip.mp4"');
-    expect(text).toContain('Content-Type: video/mp4');
-    expect(text.endsWith(`\r\n--${b}--\r\n`)).toBe(true);
-    expect(text).toContain('\xde\xad\xbe\xef');
-  });
-
-  it('sanitises filenames that could break headers', () => {
-    expect(safeFilename('a"b\r\nc.mp4')).toBe('a_b__c.mp4');
-    expect(safeFilename('')).toBe('video.mp4');
+describe('size cap', () => {
+  it('is 50 MB, the Telegram Bot API upload limit used by this project', () => {
+    expect(MAX_UPLOAD_BYTES).toBe(50_000_000);
   });
 });

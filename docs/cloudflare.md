@@ -1,72 +1,82 @@
-# Deploying on Cloudflare (free plan)
+# Setup and updates from the Cloudflare dashboard and GitHub (no console)
 
-Everything runs on Cloudflare's free plan: a Worker (webhook and admin API), D1 (database), and KV (reserved).
-No Containers, no Durable Objects, no VPS, and no computer that must stay on.
+Everything runs on Cloudflare's free plan: one Worker (Telegram webhook, admin panel, and hourly maintenance),
+one D1 database, and a KV namespace that is declared but not used yet. There is no Container, no Durable Object,
+no Docker, and no computer that must stay on. This project does not use Docker, Render, Oracle, or Cloud Run.
+
+You never need a terminal. Setup happens in the Cloudflare dashboard and the admin panel, and updates happen when you push to GitHub.
 
 ## 1. Create the Telegram bot
 1. In Telegram, open @BotFather, send `/newbot`, and copy the token.
-2. Keep the token secret. Do not put it in Git, in `wrangler.toml`, or in chat.
+2. Keep the token secret. Do not put it in GitHub, in `wrangler.toml`, or in chat.
 
-## 2. Secrets (Cloudflare Secrets, not the repository)
-Run these once from a machine with Wrangler (or set the same names in Workers Builds under Variables and Secrets):
+## 2. Create the webhook secret
+Make any random string of 32 or more characters (for example, a password manager's generator set to 40 characters).
+Telegram sends it back on every webhook call, and the Worker rejects calls without it.
 
-```sh
-npx wrangler secret put BOT_TOKEN
-npx wrangler secret put WEBHOOK_SECRET   # any random string, 32+ characters
-```
+## 3. Add the secrets in the Cloudflare dashboard
+Workers & Pages > **mediadownloaderbot** > Settings > **Variables and secrets** > Add:
 
-`WEBHOOK_SECRET` is checked on every Telegram request. Generate it with a password manager or `openssl rand -hex 32`.
+| Name | Type | Value |
+|---|---|---|
+| `BOT_TOKEN` | Secret | the token from BotFather |
+| `WEBHOOK_SECRET` | Secret | the random string from step 2 |
 
-## 3. Database
-The D1 database `mediabot` and the KV namespace `CACHE` are already declared in `wrangler.toml`.
-Apply the schema (safe to run again):
+Secrets are not shown again after saving. Changing a secret takes effect on the next request.
 
-```sh
-npx wrangler d1 migrations apply mediabot --remote
-```
+## 4. Connect the GitHub repository (automatic deploys)
+Workers & Pages > Create > Import a repository > choose `MediaDownloaderBot` > select the Worker
+`mediadownloaderbot`. In the build settings, paste these two commands exactly:
 
-## 4. Deploy
-```sh
-npx wrangler deploy
-```
+- **Build command:** `npm ci && npm run typecheck && npm test`
+- **Deploy command:** `npx wrangler deploy`
 
-The Worker is then at `https://mediadownloaderbot.<your-subdomain>.workers.dev`.
-Check it with `curl https://mediadownloaderbot.<your-subdomain>.workers.dev/health`.
+The production branch is the branch you chose in Workers Builds (`arena/b1b810c8-mediadownloaderbot`).
+Each push to that branch runs the build. If a test fails, the deploy does not happen.
 
-## 5. Register the webhook
-Telegram must call the Worker, and it must send the same secret back. Replace the three placeholders.
-Do this once after the first deploy (and again if the URL or the secret changes):
+The D1 database `mediabot` and the KV namespace are already declared in `wrangler.toml`. The Worker creates
+its tables itself on the first request, so you do not need to run any migration command.
 
-```sh
-curl "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
-  --data-urlencode "url=https://mediadownloaderbot.<your-subdomain>.workers.dev/telegram/webhook" \
-  --data-urlencode "secret_token=<WEBHOOK_SECRET>" \
-  --data-urlencode "allowed_updates=[\"message\"]"
-```
+## 5. Open the panel and change the password
+Open `https://mediadownloaderbot.<your-subdomain>.workers.dev/login`.
 
-Check the result with `https://api.telegram.org/bot<BOT_TOKEN>/getWebhookInfo`.
-Do not paste the token into chat or into a public log.
+- Username: `admin`
+- Password: `12345678`
 
-## 6. Automatic deploys (Workers Builds, optional)
-Connect the repository in Workers & Pages > Create > Import a repository. Then set:
+**Change the password immediately.** The default password is public (it is in this repository). Until it is changed,
+every panel page except the account page is blocked, but anyone who reaches the login page can sign in with the default.
 
-- **Production branch:** the branch that contains this project.
-- **Build command:** `sh scripts/workers-build.sh`
-- **Deploy command:** `npx wrangler deploy --config=wrangler.build.toml; status=$?; rm -f wrangler.build.toml; exit $status`
+## 6. Register the Telegram webhook
+Panel > **Bot and health** > **Register webhook**.
 
-The build script copies `wrangler.toml` and fills in the D1 and KV ids. It fails with a clear message when the branch
-does not contain `wrangler.toml`. Set `BOT_TOKEN` and `WEBHOOK_SECRET` as secrets in the project settings.
+The panel uses `BOT_TOKEN` and `WEBHOOK_SECRET` from step 3, and registers
+`https://<your Worker URL>/telegram/webhook`. Check the status on the same page: the username, pending updates, and the last
+Telegram error. Run **Test connection** to verify the token.
+
+If you change the Worker URL or the secret, press **Register webhook** again.
+
+## 7. Settings, platforms, and the bot
+- **Settings:** bot on/off, default language, group behaviour, rate limit (per user per minute), duplicate window,
+  maximum file size (up to 50 MB), log retention, and the maintenance message. Every value is validated on the server.
+- **Platforms:** enable or disable a platform, save a public sample link, and run an extraction test. Platforms that are
+  not implemented on Workers cannot be enabled.
+- **Logs:** searchable by severity, event, and text. Old entries are removed hourly according to the retention setting.
+- **Diagnostics:** settings, limits, and secret status (set or missing), never the values.
 
 ## Free plan limits this design respects
 | Limit | Value (Workers Free) | What the code does |
 |---|---|---|
-| CPU per request | 10 ms | Regex and small JSON parsing only; media is streamed |
-| Memory per isolate | 128 MB | No full-file buffering; 50 MB cap enforced while streaming |
-| Subrequests per request | 50 | About 4 per update |
-| Requests per day | 100,000 | Per-user limit of 5 downloads per minute |
+| CPU per request | 10 ms of CPU | Regex, small JSON, and PBKDF2 at 20,000 iterations (verify in a live deployment) |
+| Memory per isolate | 128 MB | Media is streamed, never buffered whole; 50 MB cap enforced while streaming |
+| Subrequests per request | 50 | A download uses a few calls to the source site and Telegram |
+| Requests per day | 100,000 | Per-user limit of 5 downloads per minute (configurable) |
+| Cron triggers | 5 | One hourly maintenance trigger |
+| Telegram upload | 50 MB via the public Bot API | Files over the cap return a clear error |
 
 ## Troubleshooting
-- **403 from the webhook:** the `WEBHOOK_SECRET` in Telegram does not match the Worker secret. Run `setWebhook` again.
-- **500 `server_not_configured`:** `BOT_TOKEN` or `WEBHOOK_SECRET` is missing.
-- **`no such table: download_jobs`:** the migration was not applied. Run step 3.
-- **Bot does not answer:** check `getWebhookInfo` for `last_error_message`, then the Worker logs in the dashboard.
+- **Panel says the database is not ready (503):** check the D1 binding `DB` in Settings > Bindings. It must point to `mediabot`.
+- **Bot username is empty, or Test connection fails:** `BOT_TOKEN` is missing or wrong. Fix it in step 3.
+- **Webhook shows a last error:** press **Register webhook** again. A 403 from Telegram's side means the secret does not match.
+- **500 `server_not_configured` in the logs:** `BOT_TOKEN` or `WEBHOOK_SECRET` is missing.
+- **Build fails on GitHub:** open the build log in Workers & Pages > mediadownloaderbot > Deployments.
+- **The panel shows old text after an update:** reload with Ctrl+Shift+R.

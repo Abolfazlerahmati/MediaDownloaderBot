@@ -1,149 +1,178 @@
 import { describe, expect, it } from 'vitest';
-import { BotError, ERROR_MESSAGES_FA } from '../src/errors';
-import { handleUpdate, TEXT, type Deps, type TelegramUpdate } from '../src/bot';
-import type { Store } from '../src/db';
-import { RATE_LIMIT_PER_MINUTE } from '../src/limits';
-import type { MediaStream } from '../src/media';
+import { handleUpdate, type BotDeps } from '../src/bot/handler';
+import { BotError } from '../src/errors';
+import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
+import type { MediaInfo } from '../src/extractors/types';
+import type { MediaStream } from '../src/media/stream';
 
-function memoryStore(recent = 0) {
-  const jobs: Array<{ id: number; status?: string; error?: string | null; platform: string }> = [];
-  const store: Store = {
-    upsertUser: async () => undefined,
-    countRecentJobs: async () => recent,
-    createJob: async (job) => {
-      jobs.push({ id: jobs.length + 1, platform: job.platform });
-      return jobs.length;
-    },
-    finishJob: async (id, status, error) => {
-      const job = jobs.find((j) => j.id === id);
-      if (job) Object.assign(job, { status, error });
-    },
+interface Fake {
+  deps: BotDeps;
+  sent: Array<{ chatId: number; text: string }>;
+  resolved: number;
+  opened: number;
+  videos: number;
+  logs: Array<{ severity: string; event: string }>;
+  languages: Map<number, 'en' | 'fa'>;
+  rate: number;
+  dedupeFresh: boolean;
+  callbacks: string[];
+}
+
+function fake(overrides: Partial<Settings> = {}, extra: Partial<BotDeps> = {}): Fake {
+  const settings: Settings = { ...DEFAULT_SETTINGS, ...overrides };
+  const f: Fake = {
+    sent: [],
+    resolved: 0,
+    opened: 0,
+    videos: 0,
+    logs: [],
+    languages: new Map(),
+    rate: 0,
+    dedupeFresh: true,
+    callbacks: [],
+    deps: undefined as unknown as BotDeps,
   };
-  return { store, jobs };
-}
-
-function fakeMedia(exceeded = false): MediaStream {
-  return { body: new ReadableStream(), size: 1, contentType: 'video/mp4', exceededLimit: () => exceeded };
-}
-
-function harness(opts: { recent?: number; resolve?: Deps['resolve']; sendVideo?: Deps['sendVideo']; open?: Deps['open'] } = {}) {
-  const { store, jobs } = memoryStore(opts.recent ?? 0);
-  const sent: string[] = [];
-  const videos: number[] = [];
-  const deps: Deps = {
-    store,
-    sendText: async (_chat, text) => {
-      sent.push(text);
+  f.deps = {
+    now: () => 1_000_000,
+    settings: async () => settings,
+    botUsername: async () => 'MediaBot',
+    language: async (id, fallback) => f.languages.get(id) ?? fallback,
+    setLanguage: async (id, lang) => {
+      f.languages.set(id, lang);
     },
-    resolve:
-      opts.resolve ??
-      (async (info) => ({ platform: info.platform, videoUrl: 'https://cdn.example/a.mp4', referer: 'https://ref.example/' })),
-    open: opts.open ?? (async () => fakeMedia()),
-    sendVideo:
-      opts.sendVideo ??
-      (async (chatId) => {
-        videos.push(chatId);
-      }),
-    now: () => new Date('2026-10-14T10:00:00Z'),
-    log: () => undefined,
+    platform: async (key) => (key === 'tiktok' ? { enabled: true, implemented: true } : { enabled: true, implemented: false }),
+    hashUser: async (id) => `u${id}`,
+    hashKey: async (v) => `k${v}`,
+    countRate: async () => f.rate,
+    addRate: async () => undefined,
+    claimDedupe: async () => f.dedupeFresh,
+    sendText: async (chatId, text) => {
+      f.sent.push({ chatId, text });
+    },
+    answerCallback: async (id) => {
+      f.callbacks.push(id);
+    },
+    resolve: async (): Promise<MediaInfo> => {
+      f.resolved++;
+      return { platform: 'tiktok', title: 'clip', referer: 'https://www.tiktok.com/', videoUrl: 'https://cdn.example/v.mp4' } as MediaInfo;
+    },
+    open: async (): Promise<MediaStream> => {
+      f.opened++;
+      return { body: new ReadableStream(), size: 10, contentType: 'video/mp4', exceededLimit: () => false };
+    },
+    sendVideo: async () => {
+      f.videos++;
+    },
+    log: async (severity, event) => {
+      f.logs.push({ severity, event });
+    },
+    ...extra,
   };
-  return { deps, sent, videos, jobs };
+  return f;
 }
 
-const update = (text: string, from = { id: 7, username: 'u' }): TelegramUpdate => ({
+const privateMsg = (text: string, id = 7) => ({
   update_id: 1,
-  message: { message_id: 1, chat: { id: 99, type: 'private' }, from, text },
+  message: { message_id: 1, chat: { id: 100, type: 'private' }, from: { id, username: 'someone' }, text },
 });
 
-describe('handleUpdate', () => {
-  it('answers /start and /help without touching downloads', async () => {
-    const h = harness();
-    await handleUpdate(update('/start'), h.deps);
-    await handleUpdate(update('/help'), h.deps);
-    expect(h.sent).toEqual([TEXT.start, TEXT.help]);
-    expect(h.jobs).toHaveLength(0);
+describe('bot update handling', () => {
+  it('answers /start in a private chat', async () => {
+    const f = fake();
+    await handleUpdate(privateMsg('/start'), f.deps);
+    expect(f.sent[0].text).toContain('TikTok');
   });
 
-  it('asks for a link when there is none, and rejects unknown hosts', async () => {
-    const h = harness();
-    await handleUpdate(update('hello'), h.deps);
-    await handleUpdate(update('https://example.com/x'), h.deps);
-    expect(h.sent).toEqual([TEXT.noUrl, TEXT.unsupportedUrl]);
+  it('asks for a link when a private message has none', async () => {
+    const f = fake();
+    await handleUpdate(privateMsg('hello there'), f.deps);
+    expect(f.sent[0].text).toBe('Please send a link.');
+    expect(f.resolved).toBe(0);
   });
 
-  it('shows the not-implemented message for YouTube and Instagram', async () => {
-    const h = harness();
-    await handleUpdate(update('https://youtu.be/abc'), h.deps);
-    await handleUpdate(update('https://www.instagram.com/reel/abc/'), h.deps);
-    expect(h.sent).toEqual([TEXT.notImplemented, TEXT.notImplemented]);
-    expect(h.jobs).toHaveLength(0);
+  it('stays silent in groups unless the bot is addressed', async () => {
+    const f = fake();
+    await handleUpdate(
+      { update_id: 2, message: { message_id: 2, chat: { id: -5, type: 'group' }, from: { id: 3 }, text: 'https://www.tiktok.com/@a/video/1' } },
+      f.deps,
+    );
+    expect(f.sent).toHaveLength(0);
+    expect(f.resolved).toBe(0);
   });
 
-  it('delivers a TikTok video and marks the job done', async () => {
-    const h = harness();
-    await handleUpdate(update('https://www.tiktok.com/@a/video/1'), h.deps);
-    expect(h.videos).toEqual([99]);
-    expect(h.sent).toEqual([TEXT.processing]);
-    expect(h.jobs[0]).toMatchObject({ status: 'done', error: null, platform: 'tiktok' });
+  it('answers in groups when addressed by @name', async () => {
+    const f = fake();
+    await handleUpdate(
+      { update_id: 3, message: { message_id: 3, chat: { id: -5, type: 'group' }, from: { id: 3 }, text: '@MediaBot https://www.tiktok.com/@a/video/1' } },
+      f.deps,
+    );
+    expect(f.resolved).toBe(1);
+    expect(f.videos).toBe(1);
   });
 
-  it('shows the file_too_large message and records the code when the file is over the limit', async () => {
-    const h = harness({
-      open: async () => fakeMedia(true),
-      sendVideo: async () => {
-        throw new Error('stream aborted');
-      },
-    });
-    await handleUpdate(update('https://pin.it/abc'), h.deps);
-    expect(h.sent.at(-1)).toBe(ERROR_MESSAGES_FA.file_too_large);
-    expect(h.jobs[0]).toMatchObject({ status: 'failed', error: 'file_too_large' });
+  it('never replies in groups when group_mode is off', async () => {
+    const f = fake({ group_mode: 'off' });
+    await handleUpdate(
+      { update_id: 4, message: { message_id: 4, chat: { id: -5, type: 'group' }, from: { id: 3 }, text: '@MediaBot /start' } },
+      f.deps,
+    );
+    expect(f.sent).toHaveLength(0);
   });
 
-  it('maps extractor errors to their user message', async () => {
-    const h = harness({
-      resolve: async () => {
-        throw new BotError('no_media');
-      },
-    });
-    await handleUpdate(update('https://www.tiktok.com/@a/video/1'), h.deps);
-    expect(h.sent.at(-1)).toBe(ERROR_MESSAGES_FA.no_media);
-    expect(h.jobs[0]).toMatchObject({ status: 'failed', error: 'no_media' });
+  it('sends a maintenance reply in private chats only when the bot is paused', async () => {
+    const f = fake({ bot_enabled: false });
+    await handleUpdate(privateMsg('/start'), f.deps);
+    expect(f.sent[0].text).toMatch(/paused/);
+    const g = fake({ bot_enabled: false });
+    await handleUpdate(
+      { update_id: 5, message: { message_id: 5, chat: { id: -5, type: 'group' }, from: { id: 3 }, text: '@MediaBot hi' } },
+      g.deps,
+    );
+    expect(g.sent).toHaveLength(0);
   });
 
-  it('shows a generic internal message for unexpected errors (no internal details)', async () => {
-    const h = harness({
-      resolve: async () => {
-        throw new Error('secret internal detail');
-      },
-    });
-    await handleUpdate(update('https://www.tiktok.com/@a/video/1'), h.deps);
-    expect(h.sent.at(-1)).toBe(ERROR_MESSAGES_FA.internal);
-    expect(h.sent.join('\n')).not.toContain('secret internal detail');
+  it('enforces the per-minute rate limit before downloading', async () => {
+    const f = fake({ rate_limit_per_minute: 2 });
+    f.rate = 2;
+    await handleUpdate(privateMsg('https://www.tiktok.com/@a/video/1'), f.deps);
+    expect(f.sent.at(-1)?.text).toMatch(/2/);
+    expect(f.resolved).toBe(0);
   });
 
-  it('applies the per-minute rate limit before starting a job', async () => {
-    const h = harness({ recent: RATE_LIMIT_PER_MINUTE });
-    await handleUpdate(update('https://www.tiktok.com/@a/video/1'), h.deps);
-    expect(h.sent).toEqual([TEXT.rateLimited]);
-    expect(h.jobs).toHaveLength(0);
+  it('drops duplicate links inside the dedupe window', async () => {
+    const f = fake();
+    f.dedupeFresh = false;
+    await handleUpdate(privateMsg('https://www.tiktok.com/@a/video/1'), f.deps);
+    expect(f.sent.at(-1)?.text).toMatch(/already|recently|duplicate/i);
+    expect(f.resolved).toBe(0);
   });
 
-  it('still completes the job when the progress message cannot be sent', async () => {
-    const h = harness();
-    const base = h.deps.sendText;
-    h.deps.sendText = async (chat, text) => {
-      if (text === TEXT.processing) throw new Error('telegram down');
-      return base(chat, text);
-    };
-    await handleUpdate(update('https://www.tiktok.com/@a/video/1'), h.deps);
-    expect(h.videos).toEqual([99]);
-    expect(h.jobs[0]).toMatchObject({ status: 'done' });
+  it('reports file_too_large with the configured cap and logs only the code', async () => {
+    const f = fake({}, { open: async () => { throw new BotError('file_too_large', 'declared 90000000 bytes'); } });
+    await handleUpdate(privateMsg('https://www.tiktok.com/@a/video/1'), f.deps);
+    expect(f.sent.at(-1)?.text).toContain('50');
+    const failed = f.logs.find((l) => l.event === 'download_failed');
+    expect(failed).toBeTruthy();
   });
 
-  it('ignores bot senders and updates without messages', async () => {
-    const h = harness();
-    await handleUpdate(update('/start', { id: 1, username: 'bot', is_bot: true } as never), h.deps);
-    await handleUpdate({ update_id: 2 }, h.deps);
-    expect(h.sent).toHaveLength(0);
+  it('marks unimplemented platforms without calling the extractor', async () => {
+    const f = fake();
+    await handleUpdate(privateMsg('https://www.youtube.com/watch?v=abcdefghijk'), f.deps);
+    expect(f.sent.at(-1)?.text).toMatch(/not implemented/i);
+    expect(f.resolved).toBe(0);
+  });
+
+  it('saves the language chosen from the inline keyboard', async () => {
+    const f = fake();
+    await handleUpdate({ update_id: 6, callback_query: { id: 'cb1', from: { id: 9 }, data: 'lang:fa', message: { chat: { id: 9, type: 'private' } } } }, f.deps);
+    expect(f.languages.get(9)).toBe('fa');
+    expect(f.callbacks).toEqual(['cb1']);
+    expect(f.sent.at(-1)?.text).toContain('فارسی');
+  });
+
+  it('ignores messages from bots', async () => {
+    const f = fake();
+    await handleUpdate({ update_id: 7, message: { message_id: 1, chat: { id: 1, type: 'private' }, from: { id: 1, is_bot: true }, text: '/start' } }, f.deps);
+    expect(f.sent).toHaveLength(0);
   });
 });

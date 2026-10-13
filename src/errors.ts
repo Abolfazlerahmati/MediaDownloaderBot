@@ -1,13 +1,14 @@
-// Errors the user can see. Each code maps to one clear Persian message.
-// Raw upstream responses or stack traces are never shown to users.
+// Errors the user can see. Each code maps to a fixed message (see i18n.ts). Raw details are logged only.
 
 export type ErrorCode =
   | 'not_found' // page removed or wrong URL
   | 'no_media' // page has no downloadable video
-  | 'blocked' // site refused the request (403, 401, 429)
+  | 'blocked' // site refused the request (401, 403, 429)
   | 'upstream_error' // other failure from the source site
   | 'file_too_large' // over MAX_UPLOAD_BYTES
+  | 'invalid_media' // the downloaded bytes are not an MP4 file
   | 'telegram_error' // Telegram refused the file or the request
+  | 'not_implemented' // platform is listed but not implemented on Workers
   | 'internal';
 
 export class BotError extends Error {
@@ -19,13 +20,3 @@ export class BotError extends Error {
     this.name = 'BotError';
   }
 }
-
-export const ERROR_MESSAGES_FA: Record<ErrorCode, string> = {
-  not_found: 'صفحه پیدا نشد یا حذف شده است.',
-  no_media: 'در این لینک ویدیوی قابل دانلود پیدا نشد.',
-  blocked: 'سایت مبدأ درخواست را مسدود کرد. بعداً دوباره تلاش کنید.',
-  upstream_error: 'خطا در دریافت از سایت مبدأ. بعداً دوباره تلاش کنید.',
-  file_too_large: 'حجم فایل بیشتر از ۵۰ مگابایت است و ارسال نمی‌شود.',
-  telegram_error: 'ارسال فایل به تلگرام انجام نشد.',
-  internal: 'خطای داخلی رخ داد. بعداً دوباره تلاش کنید.',
-};

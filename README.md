@@ -1,51 +1,60 @@
 # MediaDownloaderBot
 
-A Telegram bot that downloads **public** videos and sends them in the chat. It runs entirely on
-Cloudflare's **free** plan: a Worker that receives Telegram webhooks, and a D1 database.
-No server, no VPS, and no computer that has to stay on.
+A Telegram bot that downloads **public** videos and sends them in the chat, with an admin panel. It runs entirely on
+Cloudflare's **free** plan: one Worker (Telegram webhook, admin panel, hourly maintenance), a D1 database, and a KV
+namespace. No server, no VPS, no Docker, and no computer that has to stay on. No console is needed: setup happens in the
+Cloudflare dashboard and the panel, and updates happen when you push to GitHub.
 
-- **Supported now:** TikTok and Pinterest (public links; live testing is your step).
-- **Not implemented:** YouTube and Instagram. The bot replies with a clear message.
-- **Limit:** files over **50 MB** are not sent, and the user gets a clear error.
+- **Platforms implemented:** TikTok and Pinterest (public links). YouTube and Instagram are not implemented on Workers yet.
+- **Limit:** files over **50 MB** are not sent; the user gets a clear error.
+- **Languages:** English and Persian (the Persian text is a first draft that needs native review).
+- **Panel:** login with a forced first-login password change, CSRF and Origin checks, login throttling, settings with
+  validation, platform management, bot control, health checks, redacted diagnostics, searchable logs with retention,
+  and appearance (two themes, each in light, dark, or system mode). The panel is English-only for now.
 
-See [docs/platforms.md](docs/platforms.md) for the exact status of each platform.
-See [docs/cloudflare.md](docs/cloudflare.md) for deployment steps.
+Setup: [docs/cloudflare.md](docs/cloudflare.md). Platform status: [docs/platforms.md](docs/platforms.md).
 
 ## Project layout
 ```
-src/index.ts          Worker entry: routes, webhook secret check, status pages
-src/bot.ts            Telegram update handling (commands, rate limit, job records)
-src/platforms.ts      URL classification (which platform, supported or not)
-src/extractors/       Page parsing: pinterest.ts, tiktok.ts, page.ts (fetch), html.ts (helpers)
-src/media.ts          Streaming download with a 50 MB cap
-src/telegram.ts       Telegram Bot API client and streaming multipart upload
-src/db.ts             D1 store (users, download history)
-src/limits.ts         All hard limits in one place
-migrations/           D1 schema
-test/                 Vitest tests (synthetic fixtures, no network)
-scripts/workers-build.sh   Workers Builds build step
+src/index.ts          Worker entry: routes, pages, API, static assets, hourly cron
+src/webhook.ts        Telegram webhook: secret check, body limit, update processing
+src/bot/              Update handling (handler.ts), group rules, production wiring (deps.ts)
+src/platforms.ts      URL classification (platform, supported or not)
+src/extractors/       TikTok and Pinterest page parsing (fetching and HTML helpers)
+src/media/            Streaming download with a cap, MP4 header check, file names, multipart upload
+src/telegram.ts       Telegram Bot API client
+src/db/               Schema and automatic migrations (schema.ts), data access (store.ts), seeds
+src/web/              Panel: pages, JSON API, sessions, password policy, health, HTTP helpers
+src/security/         Hashing (PBKDF2), tokens, constant-time comparison
+src/i18n.ts           English and Persian messages
+src/settings.ts       Settings definitions and validation
+src/limits.ts         Hard limits in one place
+public/static/        Panel CSS and JavaScript (served by Workers Static Assets)
+migrations/           Reference copy of the version 1 schema (generated from src/db/schema.ts)
+test/                 Vitest tests against an in-memory SQLite D1 double
 ```
 
-## Development
+## Development (optional; the deployment does not need it)
 ```sh
 npm ci
 npm run typecheck
 npm test
-cp .dev.vars.example .dev.vars   # then edit values; never commit .dev.vars
-npx wrangler d1 migrations apply mediabot --local
-npm run dev
+npx wrangler dev --local     # local preview; needs a .dev.vars file, see below
 ```
+`.dev.vars` holds `BOT_TOKEN` and `WEBHOOK_SECRET` for local runs. Never commit it.
 
 ## Security notes
-- The bot token and the webhook secret are Cloudflare Secrets. They are never stored in the repository.
+- The bot token and the webhook secret are Cloudflare Secrets. They are never stored in the repository or the database.
 - Each webhook request must carry the secret header, compared in constant time. Otherwise the answer is 403.
-- Download links are fetched with browser-like headers only for the page or CDN that needs them.
-- The database stores the platform and the host of each link, not the full URL.
-- Users see short, fixed error messages. Internal details are logged without tokens.
+- Panel passwords are hashed with PBKDF2-SHA256. Sessions are random tokens stored only as hashes, in an HttpOnly,
+  Secure, SameSite=Strict cookie that lasts 12 hours. Every state-changing request needs a CSRF token and a matching Origin.
+- Login is throttled per username (5 failures per 15 minutes). Throttle keys are hashed.
+- The database stores the platform and the host of each link, not the full URL, and no usernames or download history.
+- Logs never contain tokens, full links, or user identifiers.
 
 ## Status and limits
-- Tests cover URL handling, extractors (with synthetic fixtures), streaming and size limits, Telegram
-  framing, bot flows, the webhook, and the deploy config. There are no live network tests.
-- No admin panel in this version. Moderation tools are not included yet.
-- The bot replies in Persian only.
-- Rate limiting is per user and per minute, stored in D1. It does not limit abusive traffic before the Worker.
+- Tests cover the bot flows, the webhook, panel auth and CSRF, settings validation, login throttling, rate limiting,
+  dedupe, log retention, streaming and the size cap, MP4 validation, URL handling, and the deploy configuration.
+  They run on in-memory SQLite, not on D1, and they include no live network tests.
+- The panel's client script has not been run in a real browser from the development environment. Please test it.
+- Login is throttled per username, not per IP address, so a determined attacker can try many usernames.
