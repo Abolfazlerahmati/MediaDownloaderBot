@@ -24,6 +24,9 @@ Workers & Pages > **mediadownloaderbot** > Settings > **Variables and secrets** 
 
 Secrets are not shown again after saving. Changing a secret takes effect on the next request.
 
+**The panel never accepts or stores the token.** Bot and health shows only a read-only status: set or missing.
+To change the token later, edit `BOT_TOKEN` in the same place, then in the panel run **Test connection** and **Register webhook**.
+
 ## 4. Connect the GitHub repository (automatic deploys)
 Workers & Pages > Create > Import a repository > choose `MediaDownloaderBot` > select the Worker
 `mediadownloaderbot`. In the build settings, paste these two commands exactly:
@@ -62,6 +65,7 @@ If you change the Worker URL or the secret, press **Register webhook** again.
   not implemented on Workers cannot be enabled.
 - **Logs:** searchable by severity, event, and text. Old entries are removed hourly according to the retention setting.
 - **Diagnostics:** settings, limits, and secret status (set or missing), never the values.
+- **Themes:** Merchant (blue, default) and iOS, each in light, dark, or system mode. The text colour pairs are tested for WCAG AA contrast. A Merchant SEP brand theme is not included yet, because the SEP merchant site could not be reached when this was written.
 
 ## Free plan limits this design respects
 | Limit | Value (Workers Free) | What the code does |

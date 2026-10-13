@@ -613,6 +613,7 @@
           ['Last Telegram error', wh && wh.last_error_message ? wh.last_error_message : '—'],
         ])),
         section('Actions', 'Test first. Register the webhook once the test passes.', h('div', { class: 'stack-sm' },
+          h('p', { class: 'muted', text: 'The token is read-only here. To change it, edit BOT_TOKEN in Cloudflare Secrets, then run Test connection and Register webhook.' }),
           h('p', { class: 'muted', text: 'Test connection calls Telegram getMe with the saved token.' }),
           actionBtn('Test connection', 'POST', '/api/bot/test', (x) => `Connected as @${x.username || 'unknown'}.`),
           h('p', { class: 'muted', text: 'Register points Telegram at this Worker. Telegram sends updates only after this.' }),
