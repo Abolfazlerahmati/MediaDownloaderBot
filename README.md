@@ -13,6 +13,7 @@ Cloudflare dashboard and the panel, and updates happen when you push to GitHub.
   and appearance (two themes, each in light, dark, or system mode). The panel is English-only for now.
 
 Setup: [docs/cloudflare.md](docs/cloudflare.md). Platform status: [docs/platforms.md](docs/platforms.md).
+Privacy and retention: [docs/privacy.md](docs/privacy.md). Live test checklist: [docs/testing.md](docs/testing.md).
 
 ## Project layout
 ```
@@ -30,7 +31,7 @@ src/i18n.ts           English and Persian messages
 src/settings.ts       Settings definitions and validation
 src/limits.ts         Hard limits in one place
 public/static/        Panel CSS and JavaScript (served by Workers Static Assets)
-migrations/           Reference copy of the version 1 schema (generated from src/db/schema.ts)
+migrations/           Reference copies of schema versions 1 and 2 (generated from src/db/schema.ts)
 test/                 Vitest tests against an in-memory SQLite D1 double
 ```
 
@@ -50,7 +51,7 @@ npx wrangler dev --local     # local preview; needs a .dev.vars file, see below
   Secure, SameSite=Strict cookie that lasts 12 hours. Every state-changing request needs a CSRF token and a matching Origin.
 - Login is throttled per username (5 failures per 15 minutes). Throttle keys are hashed.
 - The database stores the platform and the host of each link, not the full URL, and no usernames or download history.
-- Logs never contain tokens, full links, or user identifiers.
+- Logs never contain tokens, full links, or user identifiers. See [docs/privacy.md](docs/privacy.md) for retention.
 
 ## Status and limits
 - Tests cover the bot flows, the webhook, panel auth and CSRF, settings validation, login throttling, rate limiting,
