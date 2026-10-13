@@ -2,7 +2,8 @@
 # The Worker in src/index.ts routes every request to ONE container (the Dockerfile at the repo root).
 # Secrets are NOT stored here. The only secret is APP_SECRET_KEY (Workers Builds: Variables and Secrets).
 # The bot token is NOT a deploy-time setting: enter it in the admin panel after the first sign-in.
-name = "mediabot"
+# wrangler.toml
+name = 'mediadownloaderbot'
 main = "src/index.ts"
 compatibility_date = "2026-10-13"
 
