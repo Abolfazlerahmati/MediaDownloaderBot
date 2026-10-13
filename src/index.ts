@@ -39,6 +39,7 @@ async function handlePage(request: Request, env: Env, db: Db, now: number, path:
       csrf: auth.csrf,
       theme: auth.user.appearance_theme,
       mode: auth.user.appearance_mode,
+      lang: auth.user.appearance_lang,
       restricted: mustChange,
     }),
   );

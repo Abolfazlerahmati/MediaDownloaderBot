@@ -10,19 +10,30 @@
   const csrf = csrfMeta ? csrfMeta.getAttribute('content') || '' : '';
   const topbarStatus = document.getElementById('topbar-status');
 
+  // Translations live in /static/i18n.js. The language is per admin account (set by the server in <html lang>).
+  const tr = (text) => (window.MBI18N ? window.MBI18N.tr(text) : text);
+  if (window.MBI18N) {
+    window.MBI18N.setLang(document.documentElement.dataset.lang || 'en');
+    // The login page has no account yet, so it follows the browser language when that is Persian.
+    if (page === 'login' && /^fa\b/i.test(navigator.language || '')) window.MBI18N.setLang('fa');
+    window.MBI18N.translateTree(document.body);
+  }
+  const activeLocale = () => (window.MBI18N && window.MBI18N.getLang() === 'fa' ? 'fa-u-nu-latn' : undefined);
+
   // ---------- DOM helpers ----------
   function h(tag, attrs, ...kids) {
     const node = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs || {})) {
       if (value === undefined || value === null || value === false) continue;
       if (key === 'class') node.className = value;
-      else if (key === 'text') node.textContent = String(value);
+      else if (key === 'text') node.textContent = tr(String(value));
+      else if (key === 'placeholder' || key === 'title' || key === 'aria-label') node.setAttribute(key, tr(String(value)));
       else if (key.startsWith('on') && typeof value === 'function') node.addEventListener(key.slice(2), value);
       else node.setAttribute(key, value === true ? '' : String(value));
     }
     for (const kid of kids.flat(Infinity)) {
       if (kid === null || kid === undefined || kid === false) continue;
-      node.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+      node.append(kid instanceof Node ? kid : document.createTextNode(tr(String(kid))));
     }
     return node;
   }
@@ -63,9 +74,9 @@
 
   function confirmDialog(title, text, okLabel) {
     const dialog = document.getElementById('confirm');
-    $('#confirm-title').textContent = title;
-    $('#confirm-text').textContent = text;
-    $('#confirm-ok').textContent = okLabel;
+    $('#confirm-title').textContent = tr(title);
+    $('#confirm-text').textContent = tr(text);
+    $('#confirm-ok').textContent = tr(okLabel);
     return new Promise((resolve) => {
       const onClose = () => {
         dialog.removeEventListener('close', onClose);
@@ -78,13 +89,13 @@
 
   // ---------- formatting ----------
   const fmtDate = (ms) =>
-    ms ? new Date(ms).toLocaleString(undefined, { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
-  const rtf = typeof Intl !== 'undefined' && Intl.RelativeTimeFormat ? new Intl.RelativeTimeFormat('en', { numeric: 'auto' }) : null;
+    ms ? new Date(ms).toLocaleString(activeLocale(), { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
   function fmtRel(ms) {
     if (!ms) return '—';
+    if (typeof Intl === 'undefined' || !Intl.RelativeTimeFormat) return fmtDate(ms);
+    const rtf = new Intl.RelativeTimeFormat(activeLocale() || 'en', { numeric: 'auto' });
     const diff = (ms - Date.now()) / 1000;
     const units = [['day', 86400], ['hour', 3600], ['minute', 60]];
-    if (!rtf) return fmtDate(ms);
     for (const [unit, secs] of units) {
       if (Math.abs(diff) >= secs) return rtf.format(Math.round(diff / secs), unit);
     }
@@ -163,7 +174,7 @@
   }
 
   function emptyState(title, body) {
-    return h('div', { class: 'empty' }, h('strong', { text: title }), body ? h('span', { text: body }) : null);
+    return h('div', { class: 'empty' }, icon('i-inbox'), h('strong', { text: title }), body ? h('span', { text: body }) : null);
   }
 
   // ---------- login ----------
@@ -253,10 +264,14 @@
       h(
         'div',
         { class: 'grid-kpi' },
-        kpi('Bot', d.bot_enabled ? badge('Enabled', 'ok') : badge('Paused', 'warn'), d.bot_enabled ? 'Answering messages' : 'Turn on in Settings'),
-        kpi('Downloads, last 24 hours', String(d.downloads_24h.ok), `${d.downloads_24h.failed} failed · ${rate}`),
-        kpi('Telegram webhook', d.webhook_url ? badge('Registered', 'ok') : badge('Not registered', 'warn'), d.webhook_url ? 'Telegram sends updates here' : 'Register it in Bot and health'),
-        kpi('Pending updates', d.webhook_pending_updates === null ? '—' : String(d.webhook_pending_updates), 'Updates Telegram has not delivered yet'),
+        kpi('Bot', d.bot_enabled ? badge('Enabled', 'ok') : badge('Paused', 'warn'), d.bot_enabled ? 'Answering messages' : 'Turn on in Settings',
+          { icon: 'i-bot', tone: d.bot_enabled ? 'ok' : 'warn' }),
+        kpi('Downloads, last 24 hours', String(d.downloads_24h.ok), `${d.downloads_24h.failed} failed · ${rate}`,
+          { icon: 'i-download', tone: total && d.downloads_24h.failed ? 'warn' : 'ok', ring: ringNode(d.downloads_24h.ok, total) }),
+        kpi('Telegram webhook', d.webhook_url ? badge('Registered', 'ok') : badge('Not registered', 'warn'), d.webhook_url ? 'Telegram sends updates here' : 'Register it in Bot and health',
+          { icon: 'i-link', tone: d.webhook_url ? 'ok' : 'warn' }),
+        kpi('Pending updates', d.webhook_pending_updates === null ? '—' : String(d.webhook_pending_updates), 'Updates Telegram has not delivered yet',
+          { icon: 'i-refresh' }),
       ),
       h(
         'div',
@@ -275,12 +290,56 @@
     );
   }
 
-  function kpi(label, value, foot) {
+  // Icons come from /static/icons.svg (shared with the server-rendered navigation).
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function icon(id, cls = 'icon') {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', cls);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    const use = document.createElementNS(SVG_NS, 'use');
+    use.setAttribute('href', '/static/icons.svg#' + id);
+    svg.append(use);
+    return svg;
+  }
+
+  // Success ring: share of successful downloads. Drawn with SVG attributes (no inline styles).
+  function ringNode(ok, total) {
+    const r = 26;
+    const circumference = 2 * Math.PI * r;
+    const share = total ? ok / total : 0;
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'ring');
+    svg.setAttribute('viewBox', '0 0 64 64');
+    svg.setAttribute('aria-hidden', 'true');
+    const make = (name, attrs) => {
+      const el = document.createElementNS(SVG_NS, name);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+      return el;
+    };
+    svg.append(make('circle', { class: 'ring-track', cx: 32, cy: 32, r }));
+    if (total) {
+      svg.append(make('circle', {
+        class: 'ring-ok', cx: 32, cy: 32, r,
+        'stroke-dasharray': `${(share * circumference).toFixed(2)} ${circumference.toFixed(2)}`,
+        transform: 'rotate(-90 32 32)',
+      }));
+    }
+    const label = make('text', { x: 32, y: 37, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700, fill: 'currentColor' });
+    label.textContent = total ? `${Math.round(share * 100)}%` : '—';
+    svg.append(label);
+    return svg;
+  }
+
+  function kpi(label, value, foot, opts = {}) {
+    const chip = h('span', { class: 'kpi-chip' + (opts.tone ? ' is-' + opts.tone : '') }, icon(opts.icon || 'i-dashboard'));
     return h(
       'section',
       { class: 'card kpi' },
-      h('p', { class: 'kpi-label', text: label }),
-      h('p', { class: 'kpi-value' }, value instanceof Node ? value : document.createTextNode(String(value))),
+      h('div', { class: 'kpi-top' }, h('p', { class: 'kpi-label', text: label }), chip),
+      h('div', { class: 'kpi-row' },
+        h('p', { class: 'kpi-value' }, value instanceof Node ? value : document.createTextNode(String(value))),
+        opts.ring || null),
       h('p', { class: 'kpi-foot', text: foot }),
     );
   }
@@ -429,7 +488,7 @@
     };
     const refresh = () => {
       const n = changedKeys().length;
-      status.textContent = n ? `${n} unsaved change${n === 1 ? '' : 's'}` : 'No unsaved changes';
+      status.textContent = tr(n ? `${n} unsaved change${n === 1 ? '' : 's'}` : 'No unsaved changes');
       status.classList.toggle('is-dirty', n > 0);
       save.disabled = n === 0;
       discard.disabled = n === 0;
@@ -688,7 +747,7 @@
       more.hidden = res.data.next_offset === null;
       empty.hidden = tbody.children.length > 0;
       table.hidden = tbody.children.length === 0;
-      count.textContent = `${tbody.children.length} shown`;
+      count.textContent = tr(`${tbody.children.length} shown`);
     }
 
     form.addEventListener('submit', (event) => {
@@ -763,7 +822,7 @@
     const me = await api('GET', '/api/auth/me');
     if (!me.ok) return failed(me, renderAccount);
     const d = me.data;
-    const saved = { theme: d.appearance.theme, mode: d.appearance.mode };
+    const saved = { theme: d.appearance.theme, mode: d.appearance.mode, lang: d.appearance.lang || 'en' };
     applyAppearance(saved.theme, saved.mode);
 
     // Password
@@ -834,8 +893,8 @@
 
     if (!d.must_change_password) {
       const themeInputs = [
-        ['merchant', 'Merchant', 'Blue and white, corporate look.', ['#1d4ed8', '#eef2f7', '#101828']],
-        ['ios', 'iOS', 'Grouped surfaces and rounder corners, system blue.', ['#0062cc', '#f2f2f7', '#1c1c1e']],
+        ['merchant', 'Merchant', 'Payments console: dark navigation, dense tables, blue accent.', ['#0b2545', '#2563eb', '#f3f5f9']],
+        ['ios', 'iOS', 'Grouped surfaces, rounded corners, translucent bars, system blue.', ['#007aff', '#f2f2f7', '#1c1c1e']],
       ].map(([value, name, desc, swatches]) => {
         const input = h('input', { type: 'radio', name: 'theme', value, id: 'th-' + value });
         input.checked = saved.theme === value;
@@ -853,6 +912,12 @@
         input.addEventListener('change', preview);
         return h('label', {}, input, h('span', { text: name }));
       });
+      const langs = [['en', 'English'], ['fa', 'Persian (فارسی)']].map(([value, name]) => {
+        const input = h('input', { type: 'radio', name: 'lang', value, id: 'lg-' + value });
+        input.checked = saved.lang === value;
+        input.addEventListener('change', preview);
+        return h('label', {}, input, h('span', { text: name }));
+      });
       const apStatus = h('span', { class: 'status-text', role: 'status', text: 'Showing your saved choice.' });
       const apSave = h('button', { type: 'submit', class: 'btn btn-primary', disabled: true }, 'Save appearance');
       const apReset = h('button', { type: 'button', class: 'btn', disabled: true }, 'Cancel');
@@ -862,18 +927,22 @@
         h('div', { class: 'field' }, h('span', { class: 'field-label', id: 'md-label', text: 'Mode' }),
           h('div', { class: 'segmented', role: 'radiogroup', 'aria-labelledby': 'md-label' }, modes),
           h('p', { class: 'field-hint', text: 'System follows the device setting. The preview applies at once; press Save to keep it.' })),
+        h('div', { class: 'field' }, h('span', { class: 'field-label', id: 'lg-label', text: 'Panel language' }),
+          h('div', { class: 'segmented', role: 'radiogroup', 'aria-labelledby': 'lg-label' }, langs),
+          h('p', { class: 'field-hint', text: 'Panel language is saved with your account. Press Save appearance to apply it.' })),
         h('div', { class: 'savebar' }, apStatus, apReset, apSave));
 
       function current() {
         return {
           theme: apForm.elements.namedItem('theme').value,
           mode: apForm.elements.namedItem('mode').value,
+          lang: apForm.elements.namedItem('lang').value,
         };
       }
       function preview() {
         const c = current();
         applyAppearance(c.theme, c.mode);
-        const dirty = c.theme !== saved.theme || c.mode !== saved.mode;
+        const dirty = c.theme !== saved.theme || c.mode !== saved.mode || c.lang !== saved.lang;
         apSave.disabled = !dirty;
         apReset.disabled = !dirty;
         apStatus.textContent = dirty ? 'Preview on. Not saved yet.' : 'Showing your saved choice.';
@@ -883,6 +952,7 @@
         apForm.elements.namedItem('theme').value = saved.theme;
         for (const r of apForm.querySelectorAll('input[name="theme"]')) r.checked = r.value === saved.theme;
         for (const r of apForm.querySelectorAll('input[name="mode"]')) r.checked = r.value === saved.mode;
+        for (const r of apForm.querySelectorAll('input[name="lang"]')) r.checked = r.value === saved.lang;
         preview();
       });
       apForm.addEventListener('submit', async (event) => {
@@ -891,9 +961,13 @@
         apSave.disabled = true;
         const r = await api('PUT', '/api/account/appearance', c);
         if (r.ok) {
+          const languageChanged = c.lang !== saved.lang;
           saved.theme = c.theme;
           saved.mode = c.mode;
+          saved.lang = c.lang;
           toast('Appearance saved.');
+          // Language changes the whole layout direction, so the page is reloaded once to render it.
+          if (languageChanged) setTimeout(() => location.reload(), 600);
         } else {
           toast(errorText(r), 'err');
         }

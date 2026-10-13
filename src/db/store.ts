@@ -9,6 +9,7 @@ export interface PanelUser {
   must_change_password: number;
   appearance_theme: string;
   appearance_mode: string;
+  appearance_lang: string;
 }
 
 export interface PlatformRow {
@@ -96,10 +97,17 @@ export async function updatePassword(db: Db, userId: number, hash: string, now: 
     .run();
 }
 
-export async function setAppearance(db: Db, userId: number, theme: string, mode: string, now: number): Promise<void> {
+export async function setAppearance(
+  db: Db,
+  userId: number,
+  appearance: { theme: string; mode: string; lang: string },
+  now: number,
+): Promise<void> {
   await db
-    .prepare('UPDATE panel_users SET appearance_theme = ?, appearance_mode = ?, updated_at = ? WHERE id = ?')
-    .bind(theme, mode, now, userId)
+    .prepare(
+      'UPDATE panel_users SET appearance_theme = ?, appearance_mode = ?, appearance_lang = ?, updated_at = ? WHERE id = ?',
+    )
+    .bind(appearance.theme, appearance.mode, appearance.lang, now, userId)
     .run();
 }
 

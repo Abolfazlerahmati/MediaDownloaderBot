@@ -226,11 +226,15 @@ async function route(ctx: ApiContext, auth: AuthContext, method: string, path: s
     const body = await readJson(request);
     const theme = typeof body.theme === 'string' ? body.theme : '';
     const mode = typeof body.mode === 'string' ? body.mode : '';
+    const lang = typeof body.lang === 'string' ? body.lang : '';
     if (!['merchant', 'ios'].includes(theme) || !['light', 'dark', 'system'].includes(mode)) {
       return apiError(422, 'validation_failed', 'Unknown theme or mode.');
     }
-    await setAppearance(db, auth.user.id, theme, mode, now);
-    return json({ ok: true, appearance: { theme, mode } });
+    if (!['en', 'fa'].includes(lang)) {
+      return apiError(422, 'validation_failed', 'Unknown language.');
+    }
+    await setAppearance(db, auth.user.id, { theme, mode, lang }, now);
+    return json({ ok: true, appearance: { theme, mode, lang } });
   }
 
   return apiError(404, 'not_found', 'No such API route.');
@@ -280,7 +284,7 @@ function me(auth: AuthContext): Response {
     username: auth.user.username,
     must_change_password: auth.user.must_change_password === 1,
     csrf: auth.csrf,
-    appearance: { theme: auth.user.appearance_theme, mode: auth.user.appearance_mode },
+    appearance: { theme: auth.user.appearance_theme, mode: auth.user.appearance_mode, lang: auth.user.appearance_lang },
   });
 }
 

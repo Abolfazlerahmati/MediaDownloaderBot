@@ -65,7 +65,8 @@ If you change the Worker URL or the secret, press **Register webhook** again.
   not implemented on Workers cannot be enabled.
 - **Logs:** searchable by severity, event, and text. Old entries are removed hourly according to the retention setting.
 - **Diagnostics:** settings, limits, and secret status (set or missing), never the values.
-- **Themes:** Merchant (blue, default) and iOS, each in light, dark, or system mode. The text colour pairs are tested for WCAG AA contrast. A Merchant SEP brand theme is not included yet, because the SEP merchant site could not be reached when this was written.
+- **Themes:** Merchant (generic payments-console look, default) and iOS (generic grouped look), each in light, dark, or system mode. The text colour pairs are tested for WCAG AA contrast. The Merchant theme is generic and is not the SEP brand design, because the SEP merchant site could not be reached when this was written.
+- **Panel language:** English or Persian, saved per admin account in Appearance. It does not change the bot's default language. Persian switches the whole panel to right-to-left layout. Numbers stay in ASCII digits.
 
 ## Free plan limits this design respects
 | Limit | Value (Workers Free) | What the code does |

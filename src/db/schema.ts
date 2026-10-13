@@ -91,6 +91,11 @@ export const MIGRATIONS: Migration[] = [
        )`,
     ],
   },
+  {
+    // Panel language is per admin account. It is separate from the bot's default_language setting.
+    version: 3,
+    statements: ["ALTER TABLE panel_users ADD COLUMN appearance_lang TEXT NOT NULL DEFAULT 'en'"],
+  },
 ];
 
 export const DEFAULT_ADMIN_USERNAME = 'admin';
