@@ -13,8 +13,7 @@ binding = "DB"
 database_name = "mediabot"
 database_id = "cb32937c-110c-4621-a236-0f7f6a8b7b2f"
 
-# KV namespace bound as CACHE. The application does not use it yet. It is declared because the
-# Workers Builds build command rewrites its id. Keep the `id` line directly under `binding`.
+# KV namespace bound as CACHE. Declared for future use; the application does not read or write it yet.
 [[kv_namespaces]]
 binding = "CACHE"
 id = "c22c95c3c6ae40a88fbcd4d52c8a5471"
