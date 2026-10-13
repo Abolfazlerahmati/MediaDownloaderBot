@@ -1,6 +1,9 @@
 # Security and privacy
 
 ## Admin panel
+- **Default account:** on a fresh installation the panel has one administrator, `admin`, with the well-known password
+  `12345678`. The server refuses all admin APIs until that password is changed. Change it immediately after the first
+  deployment; until then the account is public knowledge.
 - Passwords are hashed with Argon2id. Minimum 12 characters.
 - Sessions use a random token; only its hash is stored. Cookies are `HttpOnly`, `SameSite=Strict`,
   and `Secure` by default. Sessions expire after `SESSION_TTL_HOURS`.

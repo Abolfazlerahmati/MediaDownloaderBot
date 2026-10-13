@@ -1,6 +1,12 @@
 # Administrator setup
 
-## Create the first administrator
+## Default administrator on a fresh installation
+On the first start, when no administrator exists, the bot creates **`admin` / `12345678`** and marks it *must change
+password*. Signing in shows the Account page, and the rest of the panel stays locked (the API returns 403) until you
+enter `12345678` as the current password and choose a new one (at least 12 characters). Set
+`DEFAULT_ADMIN_ENABLED=false` to skip the default account (for example on a machine that is never exposed).
+
+## Create an administrator from the command line
 ```bash
 python -m mediabot create-admin --username admin --password-stdin
 ```

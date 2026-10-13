@@ -27,7 +27,6 @@ export interface Env {
   MEDIA_BOT: DurableObjectNamespace<MediaBotContainer>;
   DB: D1Database;
   APP_SECRET_KEY: string; // wrangler secret
-  BOT_TOKEN?: string; // wrangler secret (optional)
 }
 
 type ContainerHandle = NonNullable<DurableObjectState["container"]>;
@@ -165,9 +164,6 @@ export class MediaBotContainer extends DurableObject<Env> {
         PERSISTENCE_MODE: "minimal",
         RESTART_SUPERVISED: "true",
       };
-      if (this.env.BOT_TOKEN) {
-        env.BOT_TOKEN = this.env.BOT_TOKEN;
-      }
       container.start({ env, enableInternet: true });
     }
     await this.waitUntilReady(container);

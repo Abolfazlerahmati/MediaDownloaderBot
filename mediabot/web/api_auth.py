@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from mediabot.security.passwords import hash_password, password_problem, verify_password
-from mediabot.web.auth import CurrentAdmin, require_api_admin
+from mediabot.web.auth import CurrentAdmin, require_api_admin, require_api_admin_any
 from mediabot.web.schemas import AppearanceBody, LoginBody, PasswordBody
 from mediabot.web.security import (
     APPEARANCE_COOKIE,
@@ -66,7 +66,8 @@ async def login(body: LoginBody, request: Request) -> JSONResponse:
     rt.sessions.create(rt.secret_box.session_hash(token), admin.id, csrf, ttl)
     rt.admins.touch_login(admin.id)
     appearance = appearance_for(rt, admin.appearance)
-    response = JSONResponse({"username": admin.username, "appearance": appearance})
+    response = JSONResponse({"username": admin.username, "appearance": appearance,
+                             "must_change_password": admin.must_change_password})
     set_session_cookies(response, token, csrf, secure=_secure(request), max_age=ttl)
     response.set_cookie(APPEARANCE_COOKIE, json.dumps(appearance), max_age=365 * 86400, samesite="strict",
                         secure=_secure(request), httponly=False, path="/")
@@ -86,14 +87,15 @@ async def logout(request: Request) -> JSONResponse:
 
 
 @router.get("/auth/me")
-async def me(request: Request, admin: CurrentAdmin = Depends(require_api_admin)) -> dict:
+async def me(request: Request, admin: CurrentAdmin = Depends(require_api_admin_any)) -> dict:
     rt = request.app.state.rt
-    return {"username": admin.username, "appearance": appearance_for(rt, admin.appearance)}
+    return {"username": admin.username, "appearance": appearance_for(rt, admin.appearance),
+            "must_change_password": admin.must_change_password}
 
 
 @router.post("/auth/password")
 async def change_password(body: PasswordBody, request: Request,
-                          admin: CurrentAdmin = Depends(require_api_admin)) -> dict:
+                          admin: CurrentAdmin = Depends(require_api_admin_any)) -> dict:
     rt = request.app.state.rt
     record = rt.admins.get_by_id(admin.id)
     if record is None or not verify_password(record.password_hash, body.current_password):

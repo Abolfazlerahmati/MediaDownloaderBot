@@ -51,6 +51,9 @@ class AppConfig(BaseSettings):
     db_bridge_url: str | None = None
     db_bridge_token: str | None = None
 
+    # Create admin 'admin' with password 12345678 on the first start when no administrator exists.
+    # The password must be changed at the first sign-in. Set to false to disable the default account.
+    default_admin_enabled: bool = True
     persistence_mode: Literal["minimal", "temporary"] = "minimal"
     ffmpeg_path: str | None = None
     restart_supervised: bool = False

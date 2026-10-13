@@ -30,7 +30,7 @@ def live():
 
 def test_migrate_and_round_trip_through_real_d1(live):
     live.migrate()
-    assert live.schema_version() == 1
+    assert live.schema_version() == 2
     SettingsRepo(live).set("live-check", str(time.time()))
     assert SettingsRepo(live).get("live-check") is not None
     LogRepo(live).insert({"ts": time.time(), "level": "INFO", "component": "live", "category": "t",

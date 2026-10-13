@@ -15,6 +15,7 @@ class CurrentAdmin:
     username: str
     session_hash: str
     appearance: dict
+    must_change_password: bool = False
 
 
 class PageRedirect(Exception):
@@ -40,14 +41,25 @@ def resolve_admin(request: Request) -> CurrentAdmin | None:
     if admin is None:
         return None
     return CurrentAdmin(id=admin.id, username=admin.username, session_hash=token_hash,
-                        appearance=admin.appearance)
+                        appearance=admin.appearance, must_change_password=admin.must_change_password)
 
 
-def require_api_admin(request: Request) -> CurrentAdmin:
+PASSWORD_CHANGE_PATH = "/account"
+
+
+def require_api_admin_any(request: Request) -> CurrentAdmin:
+    """Signed-in administrator, even if a password change is pending. Only the auth endpoints use this."""
     admin = resolve_admin(request)
     if admin is None:
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     request.state.admin = admin
+    return admin
+
+
+def require_api_admin(request: Request) -> CurrentAdmin:
+    admin = require_api_admin_any(request)
+    if admin.must_change_password:
+        raise HTTPException(status_code=403, detail="Choose a new password before continuing.")
     return admin
 
 
@@ -57,4 +69,6 @@ def require_page_admin(request: Request) -> CurrentAdmin:
         target = request.url.path
         raise PageRedirect(f"/login?next={target}" if target not in {"/", "/login"} else "/login")
     request.state.admin = admin
+    if admin.must_change_password and request.url.path != PASSWORD_CHANGE_PATH:
+        raise PageRedirect(PASSWORD_CHANGE_PATH)
     return admin

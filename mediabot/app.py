@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from mediabot import __version__
+from mediabot.bootstrap import ensure_default_admin
 from mediabot.bot.controller import BotController
 from mediabot.bot.dispatch import make_update_handler
 from mediabot.bot.gateway import PTBGateway
@@ -45,6 +46,7 @@ from mediabot.observability.logs_service import OperationalLogs
 from mediabot.platforms.base import PlatformAdapter
 from mediabot.platforms.registry import adapter_class
 from mediabot.platforms.service import PlatformService, seed_default_platforms
+from mediabot.security.passwords import hash_password
 from mediabot.security.secrets_box import SecretBox
 from mediabot.services.preferences import PreferenceStore
 from mediabot.services.settings import SettingsService
@@ -227,6 +229,9 @@ async def serve(rt: Runtime) -> int:
                 rt.db.schema_version(), rt.config.persistence_mode, extra={"category": "startup"})
     if rt.migrations_applied:
         logger.info("applied migrations: %s", ", ".join(rt.migrations_applied), extra={"category": "migration"})
+    if ensure_default_admin(rt.admins, enabled=rt.config.default_admin_enabled, hash_password=hash_password):
+        logger.warning("created the default administrator 'admin'; its password must be changed at the first sign-in",
+                       extra={"category": "auth"})
 
     rt.cpu.start()
     await rt.jobs.start(rt.settings.current().max_concurrent_downloads)

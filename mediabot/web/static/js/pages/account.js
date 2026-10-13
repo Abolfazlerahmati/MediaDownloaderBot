@@ -16,6 +16,8 @@ MB.ready(async () => {
     return;
   }
   let current = { ...me.appearance };
+  // A default or reset password must be replaced before anything else is available.
+  const forced = Boolean(me.must_change_password);
 
   const themeCards = el('div', { class: 'choice-cards', role: 'group', 'aria-label': 'Design theme' }, THEMES.map((t) => {
     const card = el('button', { class: 'choice-card', type: 'button', 'aria-pressed': current.theme === t.id ? 'true' : 'false', 'data-theme-choice': t.id },
@@ -66,6 +68,10 @@ MB.ready(async () => {
       const data = await MB.post('/api/auth/password', { current_password: currentPw.value, new_password: newPw.value });
       passwordForm.reset();
       MB.toast(data.message, 'success');
+      if (forced) {
+        location.assign('/');
+        return;
+      }
     } catch (error) {
       MB.setFieldErrors(passwordForm, error.fields || (error.status === 400 ? { current_password: error.message } : { new_password: error.message }));
       MB.toast(MB.errorText(error), 'error');
@@ -76,18 +82,24 @@ MB.ready(async () => {
 
   const signOut = el('button', { class: 'btn danger', type: 'button', 'data-action': 'logout' }, 'Sign out of this browser');
 
+  const passwordCard = el('section', { class: 'card stack' },
+    el('div', null, el('h2', null, 'Password'), el('p', { class: 'muted small' }, 'Passwords are hashed with Argon2id.')),
+    passwordForm);
+  const notice = forced
+    ? MB.banner('warn', 'Set a new password to continue.',
+      'The default password is still in use. Enter it as the current password, then choose a new one. Other features unlock after the change.')
+    : null;
+
   MB.clear(view).append(
     el('div', { class: 'view-head' }, el('div', null, el('h2', null, 'Account'),
       el('p', null, `Signed in as ${me.username}.`))),
-    el('div', { class: 'grid-2' },
+    ...(forced ? [notice, passwordCard] : [el('div', { class: 'grid-2' },
       el('section', { class: 'card stack' },
         el('div', null, el('h2', null, 'Appearance'), el('p', { class: 'muted small' }, 'Applies immediately and is saved to your account.')),
         el('div', { class: 'field' }, el('span', { class: 'field-label' }, 'Design theme'), themeCards),
         el('div', { class: 'field' }, el('span', { class: 'field-label' }, 'Mode'), modeButtons,
           el('p', { class: 'help' }, 'System follows your operating system’s light or dark setting.'))),
-      el('section', { class: 'card stack' },
-        el('div', null, el('h2', null, 'Password'), el('p', { class: 'muted small' }, 'Passwords are hashed with Argon2id.')),
-        passwordForm)),
+      passwordCard)]),
     el('section', { class: 'card row' },
       el('div', { class: 'spacer' }, el('h2', null, 'Session'), el('p', { class: 'muted small' }, 'Sessions expire after the configured lifetime (SESSION_TTL_HOURS).')),
       signOut));

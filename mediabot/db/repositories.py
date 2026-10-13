@@ -41,6 +41,7 @@ class Admin:
     created_at: float
     last_login_at: float | None
     is_active: bool
+    must_change_password: bool = False
 
 
 def _admin(row: sqlite3.Row) -> Admin:
@@ -52,6 +53,7 @@ def _admin(row: sqlite3.Row) -> Admin:
         created_at=row["created_at"],
         last_login_at=row["last_login_at"],
         is_active=bool(row["is_active"]),
+        must_change_password=bool(row["must_change_password"]),
     )
 
 
@@ -62,10 +64,10 @@ class AdminRepo:
     def count(self) -> int:
         return int(self._db.query_one("SELECT COUNT(*) AS c FROM admins")["c"])
 
-    def create(self, username: str, password_hash: str) -> int:
+    def create(self, username: str, password_hash: str, *, must_change: bool = False) -> int:
         return self._db.execute(
-            "INSERT INTO admins(username, password_hash, created_at) VALUES (?, ?, ?)",
-            (username, password_hash, time.time()),
+            "INSERT INTO admins(username, password_hash, created_at, must_change_password) VALUES (?, ?, ?, ?)",
+            (username, password_hash, time.time(), 1 if must_change else 0),
         )
 
     def get_by_username(self, username: str) -> Admin | None:
@@ -80,7 +82,10 @@ class AdminRepo:
         return [_admin(r) for r in self._db.query("SELECT * FROM admins ORDER BY id")]
 
     def update_password(self, admin_id: int, password_hash: str) -> None:
-        self._db.execute("UPDATE admins SET password_hash = ? WHERE id = ?", (password_hash, admin_id))
+        # Choosing a password always clears the forced-change flag.
+        self._db.execute(
+            "UPDATE admins SET password_hash = ?, must_change_password = 0 WHERE id = ?",
+            (password_hash, admin_id))
 
     def update_appearance(self, admin_id: int, appearance: dict[str, Any]) -> None:
         self._db.execute(

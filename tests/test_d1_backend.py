@@ -81,8 +81,8 @@ def test_token_is_hmac_of_secret_and_never_the_secret_itself():
 
 
 def test_migrations_apply_once_and_are_recorded(d1):
-    assert d1.migrate() == ["0001_init"]
-    assert d1.schema_version() == 1
+    assert d1.migrate() == ["0001_init", "0002_admin_must_change"]
+    assert d1.schema_version() == 2
     assert d1.migrate() == []
 
 
@@ -201,4 +201,4 @@ def test_check_command_describes_d1_not_a_local_file(tmp_path, capsys, monkeypat
     database_line = next(line for line in out.splitlines() if line.startswith("database"))
     assert "Cloudflare D1 via Worker bridge" in database_line
     assert str(tmp_path) not in database_line
-    assert "schema 1" in database_line
+    assert "schema 2" in database_line

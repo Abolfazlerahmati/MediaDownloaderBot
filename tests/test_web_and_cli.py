@@ -206,7 +206,7 @@ def test_create_admin_via_stdin_and_duplicate_rejected(tmp_path, monkeypatch, ca
 
 def test_migrations_are_idempotent(db):
     assert db.migrate() == []
-    assert db.schema_version() == 1
+    assert db.schema_version() == 2
 
 
 def test_settings_api_reports_every_invalid_field(client):
