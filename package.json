@@ -1,0 +1,16 @@
+{
+  "name": "mediabot-cloudflare",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker front for the MediaDownloaderBot container (Containers + Durable Object).",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261013.1",
+    "typescript": "5.9.3",
+    "wrangler": "4.150.0"
+  }
+}

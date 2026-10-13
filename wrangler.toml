@@ -1,0 +1,24 @@
+# Cloudflare Workers + Containers configuration for MediaDownloaderBot.
+# The Worker in src/index.ts routes every request to ONE container (the Dockerfile at the repo root).
+# Secrets are NOT stored here. Set them with:
+#   npx wrangler secret put APP_SECRET_KEY
+#   npx wrangler secret put BOT_TOKEN        (optional; you can also save the token in the panel)
+name = "mediabot"
+main = "src/index.ts"
+compatibility_date = "2026-10-13"
+
+[[containers]]
+class_name = "MediaBotContainer"
+image = "./Dockerfile"
+# standard-1 = 1/2 vCPU, 4 GiB RAM, 8 GB disk. "lite" (256 MiB) is too small for yt-dlp and ffmpeg.
+instance_type = "standard-1"
+# MUST stay 1: the SQLite database and bot polling state assume a single writer.
+max_instances = 1
+
+[[durable_objects.bindings]]
+class_name = "MediaBotContainer"
+name = "MEDIA_BOT"
+
+[exports.MediaBotContainer]
+type = "durable-object"
+storage = "sqlite"

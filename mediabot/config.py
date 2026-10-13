@@ -42,6 +42,10 @@ class AppConfig(BaseSettings):
 
     enable_bot: bool = True
     enable_web: bool = True
+    # polling: the bot asks Telegram for updates (needs a long-running process).
+    # webhook: Telegram pushes updates to <webhook_base_url>/telegram/webhook (for Cloudflare Containers).
+    bot_mode: Literal["polling", "webhook"] = "polling"
+    webhook_base_url: str | None = None
 
     persistence_mode: Literal["minimal", "temporary"] = "minimal"
     ffmpeg_path: str | None = None
@@ -92,6 +96,11 @@ class AppConfig(BaseSettings):
             )
         if not self.enable_bot and not self.enable_web:
             problems.append("Both ENABLE_BOT and ENABLE_WEB are false; nothing to run.")
+        if self.enable_bot and self.bot_mode == "webhook":
+            if not self.webhook_base_url or not self.webhook_base_url.startswith("https://"):
+                problems.append("BOT_MODE=webhook requires WEBHOOK_BASE_URL to be a public https:// URL.")
+            if not self.enable_web:
+                problems.append("BOT_MODE=webhook needs ENABLE_WEB=true: the webhook is served by the web process.")
         return problems
 
     def require_valid(self) -> None:

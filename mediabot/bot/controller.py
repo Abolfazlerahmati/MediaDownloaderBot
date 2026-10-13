@@ -93,8 +93,12 @@ COMMANDS = [
 
 class BotController:
     def __init__(self, token_provider: Callable[[], str | None], handler: Callable[[Update], Awaitable[None]],
-                 drop_pending_updates: Callable[[], bool], retry_seconds: float = 60.0) -> None:
+                 drop_pending_updates: Callable[[], bool], retry_seconds: float = 60.0,
+                 webhook_url: str | None = None, webhook_secret: str | None = None) -> None:
         self._token_provider = token_provider
+        self._webhook_url = webhook_url
+        self._webhook_secret = webhook_secret
+        self._tasks: set[asyncio.Task] = set()
         self._handler = handler
         self._drop_pending = drop_pending_updates
         self._app: Application | None = None
@@ -160,11 +164,18 @@ class BotController:
             except (NetworkError, TimedOut):
                 logger.warning("could not register bot commands", extra={"category": "telegram_api"})
             await app.start()
-            await app.updater.start_polling(  # type: ignore[union-attr]
-                allowed_updates=["message", "callback_query"],
-                drop_pending_updates=self._drop_pending(),
-                error_callback=self._on_polling_error,
-            )
+            if self.webhook_mode:
+                await app.bot.set_webhook(
+                    url=self._webhook_url, secret_token=self._webhook_secret,
+                    allowed_updates=["message", "callback_query"],
+                    drop_pending_updates=self._drop_pending(),
+                )
+            else:
+                await app.updater.start_polling(  # type: ignore[union-attr]
+                    allowed_updates=["message", "callback_query"],
+                    drop_pending_updates=self._drop_pending(),
+                    error_callback=self._on_polling_error,
+                )
         except InvalidToken:
             await self._abort(app)
             self._set_error("Telegram rejected the bot token. Check BOT_TOKEN or the token saved in the panel.",
@@ -183,7 +194,8 @@ class BotController:
         self._info.status = BotStatus.RUNNING
         self._info.last_error = None
         self._info.started_at = time.time()
-        logger.info("Telegram polling started as @%s", self._info.username, extra={"category": "bot_started"})
+        mode = "webhook" if self.webhook_mode else "polling"
+        logger.info("Telegram %s started as @%s", mode, self._info.username, extra={"category": "bot_started"})
 
     async def _abort(self, app: Application) -> None:
         try:
@@ -228,6 +240,11 @@ class BotController:
             return
         self._info.status = BotStatus.STOPPING
         try:
+            if self.webhook_mode:
+                try:
+                    await app.bot.delete_webhook()
+                except (NetworkError, TimedOut):
+                    logger.warning("could not remove the Telegram webhook", extra={"category": "telegram_api"})
             if app.updater and app.updater.running:
                 await app.updater.stop()
             await app.stop()
@@ -269,6 +286,33 @@ class BotController:
         return True, f"Connected as @{me.username}."
 
     # ----- internals -----------------------------------------------------------
+    @property
+    def webhook_mode(self) -> bool:
+        return self._webhook_url is not None
+
+    def verify_webhook_secret(self, header_value: str | None) -> bool:
+        import hmac
+
+        if not self._webhook_secret or header_value is None:
+            return False
+        return hmac.compare_digest(header_value.encode(), self._webhook_secret.encode())
+
+    def accept_webhook_update(self, payload: dict) -> bool:
+        """Hand one Telegram update to the bot. Returns False when the bot is not running.
+
+        Processing runs in a background task so the HTTP response returns immediately;
+        Telegram otherwise retries slow deliveries."""
+        app = self._app
+        if app is None or self._info.status != BotStatus.RUNNING or not self.webhook_mode:
+            return False
+        update = Update.de_json(payload, app.bot)
+        if update is None:
+            return True
+        task = asyncio.create_task(self._dispatch(update, None), name="telegram-update")
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return True
+
     async def _dispatch(self, update: Update, context: Any) -> None:
         try:
             await self._handler(update)

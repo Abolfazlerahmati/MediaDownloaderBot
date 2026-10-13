@@ -126,6 +126,9 @@ class Runtime:
             token_provider=self.tokens.get_token,
             handler=self._dispatch_update,
             drop_pending_updates=lambda: self.settings.current().drop_pending_updates_on_start,
+            webhook_url=(config.webhook_base_url.rstrip("/") + "/telegram/webhook")
+            if config.bot_mode == "webhook" and config.webhook_base_url else None,
+            webhook_secret=self.secret_box.keyed_hash("telegram-webhook-secret", "v1"),
         )
         self.gateway = PTBGateway(lambda: self.controller.bot)
         notifier = JobNotifier(self.gateway, self.translator, self.settings.current)

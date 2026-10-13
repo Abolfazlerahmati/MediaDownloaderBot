@@ -35,6 +35,7 @@ Then follow [docs/telegram-setup.md](docs/telegram-setup.md) and
 | --- | --- |
 | Local development and tests | [docs/local-development.md](docs/local-development.md) |
 | Deployment (Docker, systemd, reverse proxy) | [docs/deployment.md](docs/deployment.md) |
+| Cloudflare Workers + Containers (partially ready, see persistence) | [docs/cloudflare.md](docs/cloudflare.md) |
 | Telegram bot setup | [docs/telegram-setup.md](docs/telegram-setup.md) |
 | Group privacy mode | [docs/group-privacy-mode.md](docs/group-privacy-mode.md) |
 | Administrator setup | [docs/admin-setup.md](docs/admin-setup.md) |

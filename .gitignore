@@ -24,3 +24,5 @@ tmp/
 # Packaging artefacts
 build/
 dist/
+node_modules/
+.wrangler/

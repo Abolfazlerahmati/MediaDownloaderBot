@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from mediabot.web import api_auth, api_config, api_ops, pages
+from mediabot.web import api_auth, api_config, api_ops, pages, webhook
 from mediabot.web.auth import PageRedirect
 from mediabot.web.security import (
     UNSAFE_METHODS,
@@ -34,7 +34,8 @@ def create_web_app(rt: Runtime) -> FastAPI:
 
     @app.middleware("http")
     async def protect(request: Request, call_next):  # type: ignore[no-untyped-def]
-        if request.method in UNSAFE_METHODS:
+        # The Telegram webhook authenticates with its own secret header (checked in its route).
+        if request.method in UNSAFE_METHODS and request.url.path != webhook.WEBHOOK_PATH:
             if not origin_matches_host(request) or not csrf_ok(request):
                 response = JSONResponse({"detail": "Your session form expired. Reload the page and try again."},
                                         status_code=403)
@@ -79,5 +80,6 @@ def create_web_app(rt: Runtime) -> FastAPI:
     app.include_router(api_auth.router)
     app.include_router(api_config.router)
     app.include_router(api_ops.router)
+    app.include_router(webhook.router)
     app.include_router(pages.router)
     return app

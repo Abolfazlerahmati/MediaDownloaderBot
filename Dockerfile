@@ -30,7 +30,6 @@ ENV DATA_DIR=/data \
     ADMIN_HOST=0.0.0.0 \
     ADMIN_PORT=8080 \
     RESTART_SUPERVISED=true
-VOLUME ["/data"]
 EXPOSE 8080
 USER mediabot
 
