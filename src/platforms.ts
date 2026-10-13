@@ -11,8 +11,8 @@ export interface ClassifiedUrl {
 const RULES: Array<{ platform: Platform; supported: boolean; host: RegExp }> = [
   { platform: 'tiktok', supported: true, host: /(^|\.)tiktok\.com$/ },
   { platform: 'pinterest', supported: true, host: /(^|\.)pinterest\.[a-z.]+$|^pin\.it$/ },
-  { platform: 'youtube', supported: false, host: /(^|\.)youtube\.com$|^youtu\.be$/ },
-  { platform: 'instagram', supported: false, host: /(^|\.)instagram\.com$|^instagr\.am$/ },
+  { platform: 'youtube', supported: true, host: /(^|\.)youtube\.com$|^youtu\.be$/ },
+  { platform: 'instagram', supported: true, host: /(^|\.)instagram\.com$|^instagr\.am$/ },
 ];
 
 /** Returns the first http(s) URL in a message, without trailing punctuation. */

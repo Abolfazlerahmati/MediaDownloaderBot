@@ -5,7 +5,7 @@ Cloudflare's **free** plan: one Worker (Telegram webhook, admin panel, hourly ma
 namespace. No server, no VPS, no Docker, and no computer that has to stay on. No console is needed: setup happens in the
 Cloudflare dashboard and the panel, and updates happen when you push to GitHub.
 
-- **Platforms implemented:** TikTok and Pinterest (public links). YouTube and Instagram are not implemented on Workers yet.
+- **Platforms:** TikTok, Pinterest, YouTube, and Instagram (public links). YouTube and Instagram are disabled until you test them in the panel; they use public endpoints that may refuse Cloudflare's IP ranges.
 - **Limit:** files over **50 MB** are not sent; the user gets a clear error.
 - **Languages:** English and Persian (the Persian text is a first draft that needs native review).
 - **Panel:** login with a forced first-login password change, CSRF and Origin checks, login throttling, settings with
@@ -20,7 +20,7 @@ src/index.ts          Worker entry: routes, pages, API, static assets, hourly cr
 src/webhook.ts        Telegram webhook: secret check, body limit, update processing
 src/bot/              Update handling (handler.ts), group rules, production wiring (deps.ts)
 src/platforms.ts      URL classification (platform, supported or not)
-src/extractors/       TikTok and Pinterest page parsing (fetching and HTML helpers)
+src/extractors/       Per-platform extraction: tiktok, pinterest, youtube (player API), instagram (embed page)
 src/media/            Streaming download with a cap, MP4 header check, file names, multipart upload
 src/telegram.ts       Telegram Bot API client
 src/db/               Schema and automatic migrations (schema.ts), data access (store.ts), seeds

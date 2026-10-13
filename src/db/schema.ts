@@ -141,7 +141,8 @@ async function seedDefaults(db: Db, now: number): Promise<void> {
   for (const p of MEDIA_PLATFORM_SEEDS) {
     await db
       .prepare(
-        `INSERT OR IGNORE INTO media_platforms (key, name, enabled, implemented) VALUES (?, ?, ?, ?)`,
+        `INSERT INTO media_platforms (key, name, enabled, implemented) VALUES (?, ?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET name = excluded.name, implemented = excluded.implemented`,
       )
       .bind(p.key, p.name, p.enabled ? 1 : 0, p.implemented ? 1 : 0)
       .run();

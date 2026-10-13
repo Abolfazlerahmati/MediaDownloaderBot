@@ -3,6 +3,6 @@
 export const MEDIA_PLATFORM_SEEDS: Array<{ key: string; name: string; enabled: boolean; implemented: boolean }> = [
   { key: 'tiktok', name: 'TikTok', enabled: true, implemented: true },
   { key: 'pinterest', name: 'Pinterest', enabled: true, implemented: true },
-  { key: 'youtube', name: 'YouTube', enabled: false, implemented: false },
-  { key: 'instagram', name: 'Instagram', enabled: false, implemented: false },
+  { key: 'youtube', name: 'YouTube', enabled: false, implemented: true },
+  { key: 'instagram', name: 'Instagram', enabled: false, implemented: true },
 ];

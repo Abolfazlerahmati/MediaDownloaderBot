@@ -2,32 +2,37 @@ import { BotError } from '../errors';
 import { extractPinterest } from './pinterest';
 import { fetchPage } from './page';
 import { extractTikTok } from './tiktok';
+import { resolveYouTube, postPlayer } from './youtube';
+import { resolveInstagram } from './instagram';
 import type { MediaInfo, Platform } from './types';
 
 export type { MediaInfo, Platform } from './types';
 
-/** Platforms whose extraction is not implemented on Workers yet. */
-export const UNSUPPORTED_PLATFORMS: ReadonlySet<Platform> = new Set<Platform>(['youtube', 'instagram']);
+export interface ExtractorIO {
+  page?: (url: string) => Promise<{ html: string; finalUrl: string }>;
+  youtubePlayer?: (videoId: string) => Promise<unknown>;
+}
 
 /**
  * Resolves a public page URL to a downloadable video. Throws BotError for every failure.
- * Unsupported platforms throw 'internal'; callers must check UNSUPPORTED_PLATFORMS first.
+ * Each platform uses only the public endpoints described in its module.
  */
-export async function resolveMedia(
-  platform: Platform,
-  pageUrl: string,
-  fetcher: (url: string) => Promise<{ html: string; finalUrl: string }> = fetchPage,
-): Promise<MediaInfo> {
-  if (UNSUPPORTED_PLATFORMS.has(platform)) {
-    throw new BotError('internal', `${platform} is not implemented on Workers`);
-  }
-  const { html, finalUrl } = await fetcher(pageUrl);
+export async function resolveMedia(platform: Platform, pageUrl: string, io: ExtractorIO = {}): Promise<MediaInfo> {
+  const page = io.page ?? fetchPage;
   switch (platform) {
-    case 'pinterest':
+    case 'pinterest': {
+      const { html, finalUrl } = await page(pageUrl);
       return extractPinterest(html, finalUrl);
-    case 'tiktok':
+    }
+    case 'tiktok': {
+      const { html, finalUrl } = await page(pageUrl);
       return extractTikTok(html, finalUrl);
+    }
+    case 'youtube':
+      return resolveYouTube(pageUrl, io.youtubePlayer ?? postPlayer);
+    case 'instagram':
+      return resolveInstagram(pageUrl, page);
     default:
-      throw new BotError('internal', `no extractor for ${platform}`);
+      throw new BotError('internal', `no extractor for ${String(platform)}`);
   }
 }

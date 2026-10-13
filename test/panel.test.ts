@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, type TestDb } from './helpers/d1';
-import { ensureSchema, DEFAULT_ADMIN_PASSWORD } from '../src/db/schema';
+import { ensureSchema, resetSchemaCacheForTests, DEFAULT_ADMIN_PASSWORD } from '../src/db/schema';
 import { handleApi } from '../src/web/api';
 import { validateChanges, DEFAULT_SETTINGS } from '../src/settings';
 import { getSettings, anyUserMustChangePassword } from '../src/db/store';
@@ -57,6 +57,14 @@ describe('schema and seed', () => {
     const tiktok = rows.find((r) => r.key === 'tiktok');
     expect(tiktok?.implemented).toBe(1);
     for (const r of rows) if (r.implemented === 0) expect(r.enabled).toBe(0);
+  });
+
+  it('refreshes the implemented flags on existing databases without changing admin choices', async () => {
+    t.raw.prepare("UPDATE media_platforms SET implemented = 0, enabled = 1 WHERE key = 'youtube'").run();
+    resetSchemaCacheForTests();
+    await ensureSchema(t.db, now);
+    const row = t.raw.prepare("SELECT implemented, enabled FROM media_platforms WHERE key = 'youtube'").get() as { implemented: number; enabled: number };
+    expect(row).toEqual({ implemented: 1, enabled: 1 });
   });
 
   it('is idempotent', async () => {
@@ -214,6 +222,7 @@ describe('settings validation', () => {
 
 describe('platform management', () => {
   it('refuses to enable a platform that is not implemented', async () => {
+    t.raw.prepare("UPDATE media_platforms SET implemented = 0 WHERE key = 'youtube'").run();
     const res = await login('admin', DEFAULT_ADMIN_PASSWORD);
     const csrf = () => (t.raw.prepare('SELECT csrf_token FROM panel_sessions').get() as { csrf_token: string }).csrf_token;
     await call('/api/auth/password', { method: 'POST', cookie: res.cookie, csrf: csrf(), body: { current_password: DEFAULT_ADMIN_PASSWORD, new_password: 'correct horse battery 42' } });

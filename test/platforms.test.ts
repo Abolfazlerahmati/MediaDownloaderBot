@@ -15,9 +15,9 @@ describe('classifyUrl', () => {
     ['https://www.pinterest.com/pin/123456/', 'pinterest', true],
     ['https://pin.it/4abcDEF', 'pinterest', true],
     ['https://ir.pinterest.com/pin/9/', 'pinterest', true],
-    ['https://www.youtube.com/watch?v=abc', 'youtube', false],
-    ['https://youtu.be/abc', 'youtube', false],
-    ['https://www.instagram.com/reel/abc/', 'instagram', false],
+    ['https://www.youtube.com/watch?v=abc', 'youtube', true],
+    ['https://youtu.be/abc', 'youtube', true],
+    ['https://www.instagram.com/reel/abc/', 'instagram', true],
   ])('classifies %s as %s (supported=%s)', (url, platform, supported) => {
     const result = classifyUrl(url);
     expect(result?.platform).toBe(platform);

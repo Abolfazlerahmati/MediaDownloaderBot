@@ -3,7 +3,9 @@ import { BotError } from '../src/errors';
 import { decodeEntities, metaContent, unescapeJsonString } from '../src/extractors/html';
 import { extractPinterest } from '../src/extractors/pinterest';
 import { extractTikTok } from '../src/extractors/tiktok';
-import { resolveMedia, UNSUPPORTED_PLATFORMS } from '../src/extractors';
+import { resolveMedia } from '../src/extractors';
+import { extractYouTube, youtubeVideoId, resolveYouTube } from '../src/extractors/youtube';
+import { extractInstagram, instagramEmbedUrl, resolveInstagram } from '../src/extractors/instagram';
 
 // Synthetic fixtures: they check parsing logic only. They are not copies of live pages.
 
@@ -83,25 +85,104 @@ describe('extractTikTok', () => {
   });
 });
 
-describe('resolveMedia', () => {
-  it('refuses YouTube and Instagram without fetching anything', async () => {
-    expect(UNSUPPORTED_PLATFORMS.has('youtube')).toBe(true);
-    expect(UNSUPPORTED_PLATFORMS.has('instagram')).toBe(true);
-    let fetched = false;
-    await expect(
-      resolveMedia('youtube', 'https://youtu.be/x', async () => {
-        fetched = true;
-        return { html: '', finalUrl: '' };
-      }),
-    ).rejects.toBeInstanceOf(BotError);
-    expect(fetched).toBe(false);
+describe('YouTube', () => {
+  it('reads the video id from watch, short, shorts, and embed links', () => {
+    expect(youtubeVideoId('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10')).toBe('dQw4w9WgXcQ');
+    expect(youtubeVideoId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(youtubeVideoId('https://m.youtube.com/shorts/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(youtubeVideoId('https://www.youtube.com/embed/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(youtubeVideoId('https://www.youtube.com/watch?v=short')).toBeNull();
+    expect(youtubeVideoId('https://www.youtube.com/channel/abc')).toBeNull();
   });
 
-  it('uses the injected fetcher for TikTok and Pinterest', async () => {
-    const info = await resolveMedia('pinterest', 'https://pin.it/x', async () => ({
-      html: '<meta property="og:video" content="https://v1.pinimg.com/videos/mc/480p/a.mp4">',
-      finalUrl: 'https://www.pinterest.com/pin/1/',
-    }));
+  it('picks the highest progressive mp4 and never a ciphered URL', () => {
+    const info = extractYouTube({
+      playabilityStatus: { status: 'OK' },
+      videoDetails: { title: 'Clip' },
+      streamingData: {
+        formats: [
+          { itag: 18, mimeType: 'video/mp4; codecs="avc1, mp4a"', height: 360, url: 'https://rr.googlevideo.com/a' },
+          { itag: 22, mimeType: 'video/mp4; codecs="avc1, mp4a"', height: 720, url: 'https://rr.googlevideo.com/b' },
+          { itag: 96, mimeType: 'video/mp4', height: 1080, signatureCipher: 's=abc&url=https%3A%2F%2Fx' },
+          { itag: 43, mimeType: 'video/webm', height: 720, url: 'https://rr.googlevideo.com/c' },
+        ],
+      },
+    });
+    expect(info.videoUrl).toBe('https://rr.googlevideo.com/b');
+    expect(info.title).toBe('Clip');
+    expect(info.platform).toBe('youtube');
+  });
+
+  it('reports only adaptive streams as no_media (no ffmpeg on Workers)', () => {
+    expect(() =>
+      extractYouTube({ playabilityStatus: { status: 'OK' }, streamingData: { adaptiveFormats: [{ url: 'https://x.test/a' }] } }),
+    ).toThrow(BotError);
+  });
+
+  it('maps login walls to blocked and other failures to no_media', () => {
+    expect(() => extractYouTube({ playabilityStatus: { status: 'LOGIN_REQUIRED' } })).toThrow(expect.objectContaining({ code: 'blocked' }));
+    expect(() => extractYouTube({ playabilityStatus: { status: 'ERROR' } })).toThrow(expect.objectContaining({ code: 'no_media' }));
+  });
+
+  it('uses the injected player function', async () => {
+    const info = await resolveYouTube('https://youtu.be/dQw4w9WgXcQ', async (id) => {
+      expect(id).toBe('dQw4w9WgXcQ');
+      return { playabilityStatus: { status: 'OK' }, streamingData: { formats: [{ mimeType: 'video/mp4', url: 'https://r.googlevideo.com/x' }] } };
+    });
+    expect(info.videoUrl).toBe('https://r.googlevideo.com/x');
+  });
+});
+
+describe('Instagram', () => {
+  it('builds the embed URL for posts, reels, and TV links only', () => {
+    expect(instagramEmbedUrl('https://www.instagram.com/p/CabcdeF_12/')).toBe('https://www.instagram.com/p/CabcdeF_12/embed/captioned/');
+    expect(instagramEmbedUrl('https://instagram.com/someone/reels/CabcdeF_12/')).toBe('https://www.instagram.com/reel/CabcdeF_12/embed/captioned/');
+    expect(instagramEmbedUrl('https://www.instagram.com/someone/')).toBeNull();
+  });
+
+  it('reads video_url from escaped embed JSON, then falls back to og:video', () => {
+    const json = '<script>{"video_url":"https:\\/\\/scontent.cdninstagram.com\\/v.mp4?a=1\\u0026b=2"}</script>';
+    expect(extractInstagram(json).videoUrl).toBe('https://scontent.cdninstagram.com/v.mp4?a=1&b=2');
+    const og = '<meta property="og:video" content="https://scontent.cdninstagram.com/og.mp4?x=1&amp;y=2">';
+    expect(extractInstagram(og).videoUrl).toBe('https://scontent.cdninstagram.com/og.mp4?x=1&y=2');
+  });
+
+  it('reports no_media for a page without a video', () => {
+    expect(() => extractInstagram('<html>login</html>')).toThrow(expect.objectContaining({ code: 'no_media' }));
+  });
+
+  it('fetches only the embed URL', async () => {
+    let asked = '';
+    const info = await resolveInstagram('https://www.instagram.com/p/CabcdeF_12/', async (url) => {
+      asked = url;
+      return { html: '{"video_url":"https:\\/\\/cdn.test\\/v.mp4"}', finalUrl: url };
+    });
+    expect(asked).toBe('https://www.instagram.com/p/CabcdeF_12/embed/captioned/');
+    expect(info.referer).toBe('https://www.instagram.com/');
+  });
+});
+
+describe('resolveMedia', () => {
+  it('routes YouTube through the injected player, not the page fetcher', async () => {
+    let pageCalls = 0;
+    const info = await resolveMedia('youtube', 'https://youtu.be/dQw4w9WgXcQ', {
+      page: async () => {
+        pageCalls++;
+        return { html: '', finalUrl: '' };
+      },
+      youtubePlayer: async () => ({ playabilityStatus: { status: 'OK' }, streamingData: { formats: [{ mimeType: 'video/mp4', url: 'https://r.googlevideo.com/y' }] } }),
+    });
+    expect(info.platform).toBe('youtube');
+    expect(pageCalls).toBe(0);
+  });
+
+  it('uses the injected page fetcher for Pinterest', async () => {
+    const info = await resolveMedia('pinterest', 'https://pin.it/x', {
+      page: async () => ({
+        html: '<meta property="og:video" content="https://v1.pinimg.com/videos/mc/480p/a.mp4">',
+        finalUrl: 'https://www.pinterest.com/pin/1/',
+      }),
+    });
     expect(info.platform).toBe('pinterest');
   });
 });

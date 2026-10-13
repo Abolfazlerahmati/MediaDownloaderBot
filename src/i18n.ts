@@ -5,13 +5,12 @@ export type Lang = 'en' | 'fa';
 
 const EN = {
   start:
-    'Send a public TikTok or Pinterest link and I will send the video here.\n' +
-    'YouTube and Instagram are not available in this version.\n' +
+    'Send a public TikTok, Pinterest, YouTube, or Instagram link and I will send the video here.\n' +
     'Maximum file size: {max} MB.',
   help:
     'Send a public link. Private or login-only content is not supported.\n' +
     'Commands: /start, /help, /language\n' +
-    'Available now: TikTok and Pinterest. Maximum file size: {max} MB.',
+    'Supported: TikTok, Pinterest, YouTube, and Instagram (public links). Maximum file size: {max} MB.',
   languagePrompt: 'Choose your language:',
   languageSet: 'Language set to English.',
   noUrl: 'Please send a link.',
@@ -35,13 +34,12 @@ const EN = {
 
 const FA: typeof EN = {
   start:
-    'یک لینک عمومی TikTok یا Pinterest بفرستید تا ویدیو را همین‌جا برایتان بفرستم.\n' +
-    'دانلود از YouTube و Instagram در این نسخه فعال نیست.\n' +
+    'یک لینک عمومی TikTok، Pinterest، YouTube یا Instagram بفرستید تا ویدیو را همین‌جا برایتان بفرستم.\n' +
     'حداکثر حجم فایل: {max} مگابایت.',
   help:
     'فقط لینک عمومی بفرستید. محتوای خصوصی یا محتوایی که نیاز به ورود دارد پشتیبانی نمی‌شود.\n' +
     'دستورها: /start، /help، /language\n' +
-    'فعلاً: TikTok و Pinterest. حداکثر حجم فایل: {max} مگابایت.',
+    'پشتیبانی‌شده: TikTok، Pinterest، YouTube و Instagram (فقط لینک‌های عمومی). حداکثر حجم فایل: {max} مگابایت.',
   languagePrompt: 'زبان را انتخاب کنید:',
   languageSet: 'زبان به فارسی تغییر کرد.',
   noUrl: 'لطفاً یک لینک بفرستید.',
