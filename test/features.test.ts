@@ -171,3 +171,23 @@ describe('new settings validation', () => {
     });
   });
 });
+
+describe('origin check', () => {
+  // Imported lazily so the file stays readable at the top.
+  const url = 'https://panel.example.workers.dev/api/settings';
+  it('accepts the serving origin', async () => {
+    const { originMatches } = await import('../src/web/session');
+    expect(originMatches(new Request(url, { method: 'PUT', headers: { origin: 'https://panel.example.workers.dev' } }))).toBe(true);
+  });
+  it('accepts a same-origin request without Origin when Sec-Fetch-Site says same-origin', async () => {
+    const { originMatches } = await import('../src/web/session');
+    expect(originMatches(new Request(url, { method: 'PUT', headers: { 'sec-fetch-site': 'same-origin' } }))).toBe(true);
+  });
+  it('rejects a cross-site request, a null Origin, and a request with neither header', async () => {
+    const { originMatches } = await import('../src/web/session');
+    expect(originMatches(new Request(url, { method: 'PUT', headers: { origin: 'https://evil.example' } }))).toBe(false);
+    expect(originMatches(new Request(url, { method: 'PUT', headers: { origin: 'null' } }))).toBe(false);
+    expect(originMatches(new Request(url, { method: 'PUT', headers: { 'sec-fetch-site': 'cross-site' } }))).toBe(false);
+    expect(originMatches(new Request(url, { method: 'PUT' }))).toBe(false);
+  });
+});

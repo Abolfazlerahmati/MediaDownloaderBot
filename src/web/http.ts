@@ -9,7 +9,7 @@ export const SECURITY_HEADERS: Record<string, string> = {
     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
-  'referrer-policy': 'no-referrer',
+  'referrer-policy': 'same-origin',
   'cross-origin-opener-policy': 'same-origin',
   'cache-control': 'no-store',
 };

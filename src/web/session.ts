@@ -34,8 +34,13 @@ export function csrfMatches(auth: AuthContext, header: string | null): boolean {
   return !!header && constantTimeEqual(header, auth.csrf);
 }
 
-/** Origin must match the host that served the request. Browsers always send Origin on fetch POST. */
+/**
+ * The request must come from the host that served it. Some browsers omit Origin on same-origin fetch()
+ * calls, so when Origin is absent we accept only Sec-Fetch-Site: same-origin (set by the browser, not by the
+ * page). A cross-site request is rejected either way. The CSRF token check is a separate second layer.
+ */
 export function originMatches(request: Request): boolean {
   const origin = request.headers.get('origin');
-  return !!origin && origin === new URL(request.url).origin;
+  if (origin !== null) return origin === new URL(request.url).origin;
+  return request.headers.get('sec-fetch-site') === 'same-origin';
 }

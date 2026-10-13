@@ -3,15 +3,47 @@
 
 export type PageName = 'dashboard' | 'settings' | 'platforms' | 'bot' | 'logs' | 'diagnostics' | 'account' | 'login';
 
-const NAV: Array<{ page: PageName; href: string; label: string }> = [
-  { page: 'dashboard', href: '/', label: 'Dashboard' },
-  { page: 'settings', href: '/settings', label: 'Settings' },
-  { page: 'platforms', href: '/platforms', label: 'Platforms' },
-  { page: 'bot', href: '/bot', label: 'Bot and health' },
-  { page: 'logs', href: '/logs', label: 'Logs' },
-  { page: 'diagnostics', href: '/diagnostics', label: 'Diagnostics' },
-  { page: 'account', href: '/account', label: 'Account' },
+interface NavItem {
+  page: PageName;
+  href: string;
+  label: string;
+}
+
+interface NavGroup {
+  title: string;
+  items: NavItem[];
+}
+
+export const NAV_GROUPS: NavGroup[] = [
+  { title: 'Overview', items: [{ page: 'dashboard', href: '/', label: 'Dashboard' }] },
+  {
+    title: 'Operations',
+    items: [
+      { page: 'platforms', href: '/platforms', label: 'Platforms' },
+      { page: 'bot', href: '/bot', label: 'Bot and health' },
+      { page: 'logs', href: '/logs', label: 'Logs' },
+    ],
+  },
+  {
+    title: 'Configuration',
+    items: [
+      { page: 'settings', href: '/settings', label: 'Settings' },
+      { page: 'diagnostics', href: '/diagnostics', label: 'Diagnostics' },
+    ],
+  },
+  { title: 'Account', items: [{ page: 'account', href: '/account', label: 'Account' }] },
 ];
+
+export const PAGE_TITLES: Record<PageName, string> = {
+  dashboard: 'Dashboard',
+  settings: 'Settings',
+  platforms: 'Platforms',
+  bot: 'Bot and health',
+  logs: 'Logs',
+  diagnostics: 'Diagnostics',
+  account: 'Account',
+  login: 'Sign in',
+};
 
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
@@ -29,33 +61,82 @@ export interface ShellOptions {
 export function shell(opts: ShellOptions): string {
   const theme = opts.theme === 'ios' ? 'ios' : 'merchant';
   const mode = ['light', 'dark', 'system'].includes(opts.mode ?? '') ? opts.mode : 'system';
-  const title = opts.page === 'login' ? 'Sign in' : (NAV.find((n) => n.page === opts.page)?.label ?? 'Admin');
-  const nav =
-    opts.page === 'login'
-      ? ''
-      : `<nav class="nav" aria-label="Main">${
-          (opts.restricted ? NAV.filter((n) => n.page === 'account') : NAV)
-            .map(
-              (n) =>
-                `<a href="${n.href}"${n.page === opts.page ? ' aria-current="page"' : ''}>${escapeHtml(n.label)}</a>`,
-            )
-            .join('')
-        }<button type="button" class="link" data-action="logout">Sign out</button></nav>`;
+  const title = PAGE_TITLES[opts.page];
   const csrf = opts.csrf ? `<meta name="csrf" content="${escapeHtml(opts.csrf)}">` : '';
-  return `<!doctype html>
-<html lang="en" data-theme="${theme}" data-mode="${mode}">
+  const head = `<!doctype html>
+<html lang="en" dir="ltr" data-theme="${theme}" data-mode="${mode}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
 <title>${escapeHtml(title)} · MediaDownloaderBot</title>
 ${csrf}
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/static/fonts/estedad-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/app.css">
-</head>
-<body data-page="${opts.page}">
-<header class="top"><strong>MediaDownloaderBot</strong>${nav}</header>
-<main id="app" class="wrap" data-page="${opts.page}"><p class="muted">Loading…</p></main>
-<script src="/static/app.js" defer></script>
+</head>`;
+  const footer = `<script src="/static/app.js" defer></script>
 </body>
 </html>`;
+
+  if (opts.page === 'login') {
+    return `${head}
+<body data-page="login">
+<a class="skip-link" href="#main">Skip to content</a>
+<main id="main" class="auth" tabindex="-1">
+  <div id="app" class="auth-card"><p class="muted">Loading…</p></div>
+</main>
+<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+${footer}`;
+  }
+
+  const groups = opts.restricted ? NAV_GROUPS.filter((g) => g.items.some((i) => i.page === 'account')) : NAV_GROUPS;
+  const nav = groups
+    .map(
+      (g) =>
+        `<div class="nav-group"><p class="nav-title">${escapeHtml(g.title)}</p>${g.items
+          .map(
+            (i) =>
+              `<a class="nav-link" href="${i.href}"${i.page === opts.page ? ' aria-current="page"' : ''}>${escapeHtml(i.label)}</a>`,
+          )
+          .join('')}</div>`,
+    )
+    .join('');
+
+  return `${head}
+<body data-page="${opts.page}">
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">MD</span><span>MediaDownloaderBot</span></div>
+    <nav class="nav" aria-label="Sections">${nav}</nav>
+    <div class="sidebar-foot">
+      <button type="button" class="btn btn-ghost btn-block" data-action="logout">Sign out</button>
+    </div>
+  </aside>
+  <div class="content">
+    <header class="topbar">
+      <button type="button" class="btn btn-ghost menu-toggle" data-action="menu" aria-expanded="false" aria-controls="sidebar">Menu</button>
+      <p class="crumb" id="crumb">${escapeHtml(title)}</p>
+      <div class="topbar-right" id="topbar-status"></div>
+    </header>
+    <main id="main" class="main" tabindex="-1">
+      <div id="app" aria-busy="true"><p class="muted">Loading…</p></div>
+    </main>
+  </div>
+</div>
+<div class="scrim" data-action="menu-close" hidden></div>
+<dialog id="confirm" class="dialog" aria-labelledby="confirm-title">
+  <form method="dialog" class="dialog-body">
+    <h2 id="confirm-title">Are you sure?</h2>
+    <p id="confirm-text" class="muted"></p>
+    <div class="dialog-actions">
+      <button type="submit" value="cancel" class="btn">Cancel</button>
+      <button type="submit" value="ok" class="btn btn-primary" id="confirm-ok">Confirm</button>
+    </div>
+  </form>
+</dialog>
+<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+${footer}`;
 }

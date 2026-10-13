@@ -307,11 +307,14 @@ async function dashboard(ctx: ApiContext, auth: AuthContext): Promise<Response> 
   const since = now - 86_400_000;
   const settings = await getSettings(db);
   const platforms = await listPlatforms(db);
-  const webhook = env.BOT_TOKEN ? await safeWebhookInfo(env.BOT_TOKEN) : null;
+  const token = requireToken(env);
+  const webhook = token ? await safeWebhookInfo(token) : null;
   const defaultPasswordActive = auth.user.must_change_password === 1 || (await anyUserMustChangePassword(db));
+  const recent = await searchLogs(db, { severity: 'error', limit: 5, offset: 0 });
   return json({
     ok: true,
     bot_enabled: settings.bot_enabled,
+    recent_errors: recent.map((r) => ({ created_at: r.created_at, platform: r.platform, event: r.event, detail: r.detail })),
     downloads_24h: {
       ok: await countEventsSince(db, 'download_ok', since),
       failed: await countEventsSince(db, 'download_failed', since),
@@ -321,8 +324,8 @@ async function dashboard(ctx: ApiContext, auth: AuthContext): Promise<Response> 
     webhook_pending_updates: webhook?.pending_update_count ?? null,
     warnings: [
       ...(defaultPasswordActive ? ['The default admin password has not been changed.'] : []),
-      ...(!env.BOT_TOKEN ? ['BOT_TOKEN secret is missing.'] : []),
-      ...(env.BOT_TOKEN && !webhook?.url ? ['The Telegram webhook is not registered.'] : []),
+      ...(!token ? ['BOT_TOKEN secret is missing.'] : []),
+      ...(token && !webhook?.url ? ['The Telegram webhook is not registered.'] : []),
     ],
   });
 }
