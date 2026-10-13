@@ -35,7 +35,7 @@ Then follow [docs/telegram-setup.md](docs/telegram-setup.md) and
 | --- | --- |
 | Local development and tests | [docs/local-development.md](docs/local-development.md) |
 | Deployment (Docker, systemd, reverse proxy) | [docs/deployment.md](docs/deployment.md) |
-| Cloudflare Workers + Containers (partially ready, see persistence) | [docs/cloudflare.md](docs/cloudflare.md) |
+| Cloudflare Workers + Containers + D1 (implemented; remote deploy not verified) | [docs/cloudflare.md](docs/cloudflare.md) |
 | Telegram bot setup | [docs/telegram-setup.md](docs/telegram-setup.md) |
 | Group privacy mode | [docs/group-privacy-mode.md](docs/group-privacy-mode.md) |
 | Administrator setup | [docs/admin-setup.md](docs/admin-setup.md) |
@@ -71,7 +71,8 @@ MediaDownloaderBot/
     ├── errors.py                 # ErrorCode catalogue
     ├── bot/                      # Telegram: gateway, service rules, keyboards, controller, dispatch
     ├── db/
-    │   ├── database.py           # SQLite wrapper, migrations runner
+    │   ├── database.py           # SQLite wrapper, migrations runner, backend factory
+    │   ├── d1.py                 # Cloudflare D1 client (through the Worker bridge)
     │   ├── repositories.py       # settings, admins, sessions, platforms, preferences, logs
     │   └── migrations/0001_init.sql
     ├── health/                   # checks, health service, diagnostics catalogue, reports

@@ -9,7 +9,7 @@ import sys
 
 from mediabot import __version__
 from mediabot.config import ConfigError, load_config
-from mediabot.db.database import Database
+from mediabot.db.database import Database, open_database
 from mediabot.db.repositories import AdminRepo
 from mediabot.security.passwords import hash_password, password_problem
 
@@ -36,7 +36,7 @@ def _read_password(args: argparse.Namespace) -> str | None:
 def _open_db() -> Database:
     config = load_config()
     config.require_valid()
-    db = Database(config.resolved_database_path)
+    db = open_database(config)
     db.migrate()
     return db
 
@@ -101,7 +101,7 @@ def _cmd_check(_: argparse.Namespace) -> int:
     except ConfigError as exc:
         print(f"Configuration problem:\n{exc}", file=sys.stderr)
         return 2
-    db = Database(config.resolved_database_path)
+    db = open_database(config)
     applied = db.migrate()
     print(f"MediaDownloaderBot {__version__}")
     print(f"database     : {config.resolved_database_path} (schema {db.schema_version()}, applied now: {applied or 'none'})")

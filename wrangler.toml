@@ -15,6 +15,12 @@ instance_type = "standard-1"
 # MUST stay 1: the SQLite database and bot polling state assume a single writer.
 max_instances = 1
 
+# Cloudflare D1 database used by the bot (see docs/cloudflare.md). The name must match the existing database.
+[[d1_databases]]
+binding = "DB"
+database_name = "mediabot"
+database_id = "cb32937c-110c-4621-a236-0f7f6a8b7b2f"
+
 [[durable_objects.bindings]]
 class_name = "MediaBotContainer"
 name = "MEDIA_BOT"

@@ -46,6 +46,10 @@ class AppConfig(BaseSettings):
     # webhook: Telegram pushes updates to <webhook_base_url>/telegram/webhook (for Cloudflare Containers).
     bot_mode: Literal["polling", "webhook"] = "polling"
     webhook_base_url: str | None = None
+    # sqlite: local file (default). d1: Cloudflare D1 through the Worker bridge (Cloudflare deployment).
+    db_backend: Literal["sqlite", "d1"] = "sqlite"
+    db_bridge_url: str | None = None
+    db_bridge_token: str | None = None
 
     persistence_mode: Literal["minimal", "temporary"] = "minimal"
     ffmpeg_path: str | None = None
@@ -96,6 +100,11 @@ class AppConfig(BaseSettings):
             )
         if not self.enable_bot and not self.enable_web:
             problems.append("Both ENABLE_BOT and ENABLE_WEB are false; nothing to run.")
+        if self.db_backend == "d1":
+            if not self.db_bridge_url or not self.db_bridge_url.startswith(("https://", "http://127.0.0.1", "http://localhost")):
+                problems.append("DB_BACKEND=d1 requires DB_BRIDGE_URL (https://...). Plain http is allowed only for localhost tests.")
+            if not self.db_bridge_token or len(self.db_bridge_token) < 32:
+                problems.append("DB_BACKEND=d1 requires DB_BRIDGE_TOKEN (set by the Worker; at least 32 characters).")
         if self.enable_bot and self.bot_mode == "webhook":
             if not self.webhook_base_url or not self.webhook_base_url.startswith("https://"):
                 problems.append("BOT_MODE=webhook requires WEBHOOK_BASE_URL to be a public https:// URL.")

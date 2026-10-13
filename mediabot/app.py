@@ -24,7 +24,7 @@ from mediabot.bot.gateway import PTBGateway
 from mediabot.bot.notifier import JobNotifier
 from mediabot.bot.service import BotDependencies, BotService
 from mediabot.config import AppConfig
-from mediabot.db.database import Database
+from mediabot.db.database import open_database
 from mediabot.db.repositories import (
     AdminRepo,
     LogRepo,
@@ -95,7 +95,7 @@ class Runtime:
         self.config = config
         self.version = __version__
         self.started_at = time.time()
-        self.db = Database(config.resolved_database_path)
+        self.db = open_database(config)
         self.migrations_applied = self.db.migrate()
         self.translator = get_translator()
         self.secret_box = SecretBox(config.app_secret_key or "")
@@ -165,7 +165,7 @@ class Runtime:
         await self._update_handler(update)
 
     def secrets(self) -> list[str]:
-        values = [self.config.app_secret_key or ""]
+        values = [self.config.app_secret_key or "", self.config.db_bridge_token or ""]
         token = self.tokens.get_token()
         if token:
             values.append(token)

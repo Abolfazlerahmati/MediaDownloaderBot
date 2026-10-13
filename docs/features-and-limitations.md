@@ -26,6 +26,8 @@
 - yt-dlp extractors break when platforms change. Keep yt-dlp updated and use the live tests.
 - Platform live tests need a public sample URL that you choose.
 - Single-process design: run one instance per data directory. SQLite is not a multi-writer database.
+- Cloudflare deployment stores data in D1 through the Worker bridge. Each query is a network round trip and
+  blocks the bot's event loop while it runs. See [cloudflare.md](cloudflare.md) for the full list.
 - Login throttling state is in memory and resets on restart.
 - The panel has no built-in TLS. Use a reverse proxy.
 - Not implemented: multiple administrator roles (all administrators have full access), two-factor

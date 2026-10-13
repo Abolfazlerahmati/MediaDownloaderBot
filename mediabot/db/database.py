@@ -131,3 +131,12 @@ class Database:
             applied.append(path.stem)
             logger.info("applied migration %s", path.stem, extra={"category": "migration"})
         return applied
+
+
+def open_database(config: Any) -> Any:
+    """Return the configured backend: local SQLite (default) or Cloudflare D1 through the bridge."""
+    if getattr(config, "db_backend", "sqlite") == "d1":
+        from mediabot.db.d1 import D1Database
+
+        return D1Database(config.db_bridge_url, config.db_bridge_token or "")
+    return Database(config.resolved_database_path)

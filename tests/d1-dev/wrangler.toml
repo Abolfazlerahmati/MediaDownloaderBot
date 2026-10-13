@@ -1,0 +1,18 @@
+# Local test config: the Worker and its D1 binding WITHOUT the container (no Docker needed).
+# Run from the repository root:  npx wrangler dev --config tests/d1-dev/wrangler.toml --port 8787
+name = "mediabot-d1-dev"
+main = "../../src/index.ts"
+compatibility_date = "2026-10-13"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mediabot"
+database_id = "local-dev-only"
+
+[[durable_objects.bindings]]
+class_name = "MediaBotContainer"
+name = "MEDIA_BOT"
+
+[exports.MediaBotContainer]
+type = "durable-object"
+storage = "sqlite"
