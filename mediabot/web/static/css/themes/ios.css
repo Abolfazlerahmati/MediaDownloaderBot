@@ -1,0 +1,61 @@
+/*
+ * "iOS-inspired" theme: soft grouped surfaces, large radii, system-blue accent,
+ * translucent light navigation and pill-shaped controls. Original styling; it does
+ * not use Apple's proprietary fonts or icons.
+ */
+
+[data-theme="ios"] {
+  --radius: 12px;
+  --radius-lg: 18px;
+  --btn-radius: 999px;
+  --radius-pill: 999px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Helvetica Neue", system-ui, Roboto, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sidebar-w: 240px;
+  --sidebar-bg: color-mix(in srgb, var(--surface) 82%, transparent);
+  --sidebar-text: var(--muted);
+  --sidebar-active-bg: var(--accent-soft);
+  --sidebar-active-text: var(--accent);
+  --header-bg: color-mix(in srgb, var(--surface) 86%, transparent);
+  --card-border: 0;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="ios"] body { -webkit-font-smoothing: antialiased; }
+[data-theme="ios"] .sidebar { backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px); border-inline-end: 0; }
+[data-theme="ios"] .topbar { backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px); border-bottom: 0; box-shadow: 0 0.5px 0 var(--border); }
+[data-theme="ios"] .brand-mark { border-radius: 10px; background: linear-gradient(180deg, #3aa0ff, var(--accent)); }
+[data-theme="ios"] .nav-link { border-radius: 10px; font-weight: 500; }
+[data-theme="ios"] .page-title { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; }
+[data-theme="ios"] .card-head h2 { font-size: 1.05rem; }
+[data-theme="ios"] .table-wrap { border: 0; box-shadow: var(--card-shadow); }
+[data-theme="ios"] th { background: transparent; }
+[data-theme="ios"] tbody tr:hover td { background: var(--surface-3); }
+[data-theme="ios"] input[type="text"], [data-theme="ios"] input[type="password"], [data-theme="ios"] input[type="number"],
+[data-theme="ios"] input[type="url"], [data-theme="ios"] input:not([type]), [data-theme="ios"] select, [data-theme="ios"] textarea {
+  border-color: transparent; border-radius: 12px; background: var(--surface-3);
+}
+[data-theme="ios"] .btn { border-color: transparent; }
+[data-theme="ios"] .btn.primary { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
+[data-theme="ios"] .segmented { border-radius: 999px; }
+[data-theme="ios"] .segmented button { border-radius: 999px; }
+[data-theme="ios"] .segmented button[aria-pressed="true"] { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+[data-theme="ios"] .choice-card { border-radius: 18px; border: 2px solid transparent; box-shadow: var(--card-shadow); }
+[data-theme="ios"] .choice-card[aria-pressed="true"] { border-color: var(--accent); }
+[data-theme="ios"] .toast { border: 0; border-radius: 16px; }
+[data-theme="ios"] .badge { letter-spacing: 0.01em; }
+[data-theme="ios"] .stat-value { font-weight: 700; letter-spacing: -0.02em; }
+[data-theme="ios"] .banner { border: 0; border-radius: 14px; }
+[data-theme="ios"] .empty { border: 0; background: var(--surface); }
+
+/* Blue palette follows the system accent colours used on iOS */
+[data-theme="ios"][data-mode="light"] { --accent: #007aff; --accent-soft: rgba(0, 122, 255, 0.12); }
+[data-theme="ios"][data-mode="dark"] { --accent: #0a84ff; --accent-soft: rgba(10, 132, 255, 0.2); }
+@media (prefers-color-scheme: dark) {
+  [data-theme="ios"][data-mode="system"] { --accent: #0a84ff; --accent-soft: rgba(10, 132, 255, 0.2); }
+}
+[data-theme="ios"][data-mode="light"] { --bg: #f2f2f7; --surface: #ffffff; --surface-2: #f7f7fa; --surface-3: #e9e9ef; }
+[data-theme="ios"][data-mode="dark"] { --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --surface-3: #3a3a3c; --border: #38383a; --border-strong: #48484a; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="ios"][data-mode="system"] { --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --surface-3: #3a3a3c; --border: #38383a; --border-strong: #48484a; }
+}

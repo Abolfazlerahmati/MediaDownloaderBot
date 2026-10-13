@@ -1,0 +1,105 @@
+"""Environment-based configuration (validated at startup).
+
+Only deployment-level settings live here. Operator-tunable behaviour (limits,
+languages, themes, retention ...) is stored in the database and managed from the
+admin panel - see ``mediabot.services.settings``.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+MIN_SECRET_LENGTH = 32
+
+
+class ConfigError(RuntimeError):
+    """Raised when required deployment configuration is missing or invalid."""
+
+
+class AppConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    app_secret_key: str | None = None
+    bot_token: str | None = None
+
+    data_dir: Path = Path("data")
+    database_path: Path | None = None
+    temp_dir: Path | None = None
+
+    admin_host: str = "127.0.0.1"
+    admin_port: int = Field(default=8080, ge=1, le=65535)
+    admin_cookie_secure: bool = True
+    session_ttl_hours: int = Field(default=12, ge=1, le=168)
+
+    enable_bot: bool = True
+    enable_web: bool = True
+
+    persistence_mode: Literal["minimal", "temporary"] = "minimal"
+    ffmpeg_path: str | None = None
+    restart_supervised: bool = False
+
+    @field_validator("bot_token", mode="before")
+    @classmethod
+    def _blank_token_is_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("app_secret_key", mode="before")
+    @classmethod
+    def _blank_secret_is_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    # ----- derived paths -------------------------------------------------
+    @property
+    def resolved_data_dir(self) -> Path:
+        return self.data_dir.expanduser().resolve()
+
+    @property
+    def resolved_database_path(self) -> Path:
+        if self.database_path is not None:
+            return self.database_path.expanduser().resolve()
+        return self.resolved_data_dir / "app.db"
+
+    @property
+    def resolved_temp_dir(self) -> Path:
+        if self.temp_dir is not None:
+            return self.temp_dir.expanduser().resolve()
+        return self.resolved_data_dir / "tmp"
+
+    def validation_problems(self) -> list[str]:
+        """Return human-readable problems that prevent the application from starting."""
+        problems: list[str] = []
+        if not self.app_secret_key:
+            problems.append(
+                "APP_SECRET_KEY is not set. Generate one with "
+                "`python -m mediabot.cli gen-secret` and put it in your .env file."
+            )
+        elif len(self.app_secret_key) < MIN_SECRET_LENGTH:
+            problems.append(
+                f"APP_SECRET_KEY must be at least {MIN_SECRET_LENGTH} characters long."
+            )
+        if not self.enable_bot and not self.enable_web:
+            problems.append("Both ENABLE_BOT and ENABLE_WEB are false; nothing to run.")
+        return problems
+
+    def require_valid(self) -> None:
+        problems = self.validation_problems()
+        if problems:
+            raise ConfigError("\n".join(f"- {p}" for p in problems))
+
+
+def load_config() -> AppConfig:
+    """Load configuration from the environment / .env file."""
+    return AppConfig()

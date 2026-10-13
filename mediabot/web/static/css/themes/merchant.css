@@ -1,0 +1,52 @@
+/*
+ * "Merchant" theme: a professional payments-dashboard look. Deep navy navigation,
+ * compact cards, squared-off controls and a restrained blue accent.
+ * This is an original styling inspired by the general conventions of merchant
+ * payment consoles; it is not affiliated with, and does not reproduce assets from,
+ * any specific provider.
+ */
+
+[data-theme="merchant"] {
+  --radius: 8px;
+  --radius-lg: 12px;
+  --btn-radius: 8px;
+  --font: "Segoe UI", "Noto Sans", "Noto Sans Arabic", Tahoma, system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --sidebar-w: 260px;
+  --sidebar-bg: #0b2545;
+  --sidebar-text: #b8c8e4;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.12);
+  --sidebar-active-text: #ffffff;
+  --header-bg: var(--surface);
+  --card-border: 1px solid var(--border);
+  --card-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+[data-theme="merchant"] .brand-mark {
+  background: linear-gradient(135deg, #1f6feb, #0b5ed7);
+  border-radius: 8px;
+  letter-spacing: 0.02em;
+}
+
+[data-theme="merchant"] .sidebar .brand-text strong { color: #ffffff; }
+[data-theme="merchant"] .sidebar .nav-link:hover { background: rgba(255, 255, 255, 0.07); color: #ffffff; }
+[data-theme="merchant"] .sidebar .pill { background: rgba(255, 255, 255, 0.12); color: #dbe6fb; }
+[data-theme="merchant"] .sidebar .small { color: #9fb4d6; }
+
+[data-theme="merchant"] .page-title { font-weight: 700; letter-spacing: -0.01em; }
+[data-theme="merchant"] .card-head h2 { color: var(--text); }
+[data-theme="merchant"] .stat-value { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+[data-theme="merchant"] th { letter-spacing: 0; }
+[data-theme="merchant"] .btn.primary { background: #0b5ed7; border-color: #0b5ed7; }
+[data-theme="merchant"] .btn.primary:hover:not(:disabled) { background: #0a52bd; }
+[data-theme="merchant"] .view-head h2 { font-size: 1.15rem; }
+
+@media (max-width: 960px) {
+  [data-theme="merchant"] .sidebar { background: #0b2545; }
+}
+
+/* Accent per palette */
+[data-theme="merchant"][data-mode="light"] { --accent: #0b5ed7; --accent-soft: #e3edfd; }
+[data-theme="merchant"][data-mode="dark"] { --accent: #6aa6ff; --accent-soft: rgba(106, 166, 255, 0.16); }
+@media (prefers-color-scheme: dark) {
+  [data-theme="merchant"][data-mode="system"] { --accent: #6aa6ff; --accent-soft: rgba(106, 166, 255, 0.16); }
+}

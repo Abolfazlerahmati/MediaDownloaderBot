@@ -1,0 +1,124 @@
+/*
+ * Design tokens shared by every theme.
+ *
+ * Colour palettes are selected by data-mode (light | dark | system). Theme files
+ * (themes/*.css) only set shape, typography, density and accent treatment, so the
+ * same components render differently per theme without duplicated markup.
+ */
+
+:root,
+[data-mode="light"] {
+  color-scheme: light;
+  --bg: #f3f5f9;
+  --surface: #ffffff;
+  --surface-2: #f6f8fb;
+  --surface-3: #eaeff6;
+  --text: #0f172a;
+  --text-2: #334155;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --accent: #2563eb;
+  --accent-contrast: #ffffff;
+  --accent-soft: #dbeafe;
+  --focus: rgba(37, 99, 235, 0.35);
+  --ok: #15803d;
+  --ok-bg: #dcfce7;
+  --warn: #b45309;
+  --warn-bg: #fef3c7;
+  --bad: #b91c1c;
+  --bad-bg: #fee2e2;
+  --info: #1d4ed8;
+  --info-bg: #dbeafe;
+  --neutral: #475569;
+  --neutral-bg: #e2e8f0;
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-2: 0 6px 20px rgba(15, 23, 42, 0.08);
+  --overlay: rgba(15, 23, 42, 0.5);
+}
+
+[data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #0b1120;
+  --surface: #121a2c;
+  --surface-2: #162036;
+  --surface-3: #1d2944;
+  --text: #e6edf8;
+  --text-2: #c3cee0;
+  --muted: #8c99b2;
+  --border: #22304a;
+  --border-strong: #33446a;
+  --accent: #60a5fa;
+  --accent-contrast: #0b1120;
+  --accent-soft: rgba(96, 165, 250, 0.16);
+  --focus: rgba(96, 165, 250, 0.45);
+  --ok: #4ade80;
+  --ok-bg: rgba(34, 197, 94, 0.14);
+  --warn: #fbbf24;
+  --warn-bg: rgba(251, 191, 36, 0.14);
+  --bad: #f87171;
+  --bad-bg: rgba(248, 113, 113, 0.14);
+  --info: #93c5fd;
+  --info-bg: rgba(59, 130, 246, 0.18);
+  --neutral: #aab6cc;
+  --neutral-bg: rgba(148, 163, 184, 0.16);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --overlay: rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-mode="system"] {
+    color-scheme: dark;
+    --bg: #0b1120;
+    --surface: #121a2c;
+    --surface-2: #162036;
+    --surface-3: #1d2944;
+    --text: #e6edf8;
+    --text-2: #c3cee0;
+    --muted: #8c99b2;
+    --border: #22304a;
+    --border-strong: #33446a;
+    --accent: #60a5fa;
+    --accent-contrast: #0b1120;
+    --accent-soft: rgba(96, 165, 250, 0.16);
+    --focus: rgba(96, 165, 250, 0.45);
+    --ok: #4ade80;
+    --ok-bg: rgba(34, 197, 94, 0.14);
+    --warn: #fbbf24;
+    --warn-bg: rgba(251, 191, 36, 0.14);
+    --bad: #f87171;
+    --bad-bg: rgba(248, 113, 113, 0.14);
+    --info: #93c5fd;
+    --info-bg: rgba(59, 130, 246, 0.18);
+    --neutral: #aab6cc;
+    --neutral-bg: rgba(148, 163, 184, 0.16);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.35);
+    --overlay: rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Shape and type defaults (themes override) */
+:root {
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --sidebar-w: 248px;
+  --sidebar-bg: var(--surface);
+  --sidebar-text: var(--text-2);
+  --sidebar-active-bg: var(--accent-soft);
+  --sidebar-active-text: var(--accent);
+  --header-bg: var(--surface);
+  --card-border: 1px solid var(--border);
+  --card-shadow: var(--shadow-1);
+  --btn-radius: var(--radius);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+}
