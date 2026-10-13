@@ -79,3 +79,31 @@ def test_worker_does_not_require_a_bot_token_at_deploy_time():
     src = (ROOT / "src/index.ts").read_text(encoding="utf-8")
     assert "BOT_TOKEN" not in src
     assert "APP_SECRET_KEY" in src
+
+
+def test_workers_build_script_matches_the_documented_build(tmp_path):
+    import shutil
+    import subprocess
+
+    (tmp_path / "scripts").mkdir()
+    shutil.copy(ROOT / "scripts/workers-build.sh", tmp_path / "scripts/workers-build.sh")
+    shutil.copy(ROOT / "wrangler.toml", tmp_path / "wrangler.toml")
+    subprocess.run(["sh", "scripts/workers-build.sh"], cwd=tmp_path, check=True)
+    via_script = (tmp_path / "wrangler.build.toml").read_text(encoding="utf-8")
+
+    other = tmp_path / "manual"
+    other.mkdir()
+    shutil.copy(ROOT / "wrangler.toml", other / "wrangler.toml")
+    subprocess.run(["sh", "-c", BUILD_COMMAND], cwd=other, check=True)
+    assert via_script == (other / "wrangler.build.toml").read_text(encoding="utf-8")
+
+
+def test_workers_build_script_fails_clearly_without_wrangler_toml(tmp_path):
+    import shutil
+    import subprocess
+
+    (tmp_path / "scripts").mkdir()
+    shutil.copy(ROOT / "scripts/workers-build.sh", tmp_path / "scripts/workers-build.sh")
+    result = subprocess.run(["sh", "scripts/workers-build.sh"], cwd=tmp_path, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert "production branch" in result.stderr

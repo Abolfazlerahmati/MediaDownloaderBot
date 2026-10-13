@@ -39,6 +39,15 @@ The build step creates `wrangler.build.toml`, and the deploy step removes it aga
 
 If the build log says `wrangler` is missing or is not the pinned 4.150.0, prefix the build command with `npm ci && `.
 
+### Simpler build command (recommended if pasting fails)
+If the dashboard keeps changing the command text, set the Build command to just this (no special characters):
+
+```bash
+sh scripts/workers-build.sh
+```
+
+It makes the same `wrangler.build.toml` as the long command, and it stops with a clear message if the cloned branch has no `wrangler.toml`. The deploy command does not change.
+
 ### Troubleshooting: `cp: cannot stat 'wrangler.toml'`
 The build clones the **production branch**, and that branch does not contain the project. Check that the production
 branch in Workers Builds is the branch with the code (for example `arena/b1b810c8-mediadownloaderbot`), or merge the
