@@ -82,6 +82,15 @@ export const MIGRATIONS: Migration[] = [
        )`,
     ],
   },
+  {
+    version: 2,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS active_jobs (
+         id TEXT PRIMARY KEY,
+         started_at INTEGER NOT NULL
+       )`,
+    ],
+  },
 ];
 
 export const DEFAULT_ADMIN_USERNAME = 'admin';
@@ -93,7 +102,7 @@ export interface Stmt {
   bind(...values: unknown[]): Stmt;
   first<T = Record<string, unknown>>(): Promise<T | null>;
   all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
-  run(): Promise<unknown>;
+  run(): Promise<{ meta?: { changes?: number } }>;
 }
 
 export interface Db {

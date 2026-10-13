@@ -173,18 +173,43 @@ export async function addRateEvent(db: Db, userHash: string, now: number): Promi
 }
 
 /** Returns true when the key was free and is now claimed for `windowMs`. */
+/**
+ * Claims a key for `windowMs`. One statement decides, so two redeliveries that arrive together
+ * cannot both win: the row is only replaced when the old claim is older than the window.
+ */
 export async function claimDedupeKey(db: Db, keyHash: string, now: number, windowMs: number): Promise<boolean> {
   if (windowMs <= 0) return true;
-  const existing = await db
-    .prepare('SELECT created_at FROM dedupe_keys WHERE key_hash = ?')
-    .bind(keyHash)
-    .first<{ created_at: number }>();
-  if (existing && now - existing.created_at < windowMs) return false;
-  await db
-    .prepare('INSERT INTO dedupe_keys (key_hash, created_at) VALUES (?, ?) ON CONFLICT(key_hash) DO UPDATE SET created_at = excluded.created_at')
-    .bind(keyHash, now)
+  const row = await db
+    .prepare(
+      `INSERT INTO dedupe_keys (key_hash, created_at) VALUES (?, ?)
+       ON CONFLICT(key_hash) DO UPDATE SET created_at = excluded.created_at
+       WHERE dedupe_keys.created_at <= ?
+       RETURNING key_hash`,
+    )
+    .bind(keyHash, now, now - windowMs)
+    .first<{ key_hash: string }>();
+  return row !== null;
+}
+
+/**
+ * Takes one of the limited job slots. Slots left behind by a crashed job expire after `staleMs`.
+ * The count check and the insert are one statement, so the limit holds even under parallel updates.
+ */
+export async function acquireJobSlot(db: Db, jobId: string, now: number, max: number, staleMs: number): Promise<boolean> {
+  await db.prepare('DELETE FROM active_jobs WHERE started_at < ?').bind(now - staleMs).run();
+  // One statement: the count check and the insert happen together, so two updates cannot both take the last slot.
+  const result = await db
+    .prepare(
+      `INSERT INTO active_jobs (id, started_at)
+       SELECT ?, ? WHERE (SELECT COUNT(*) FROM active_jobs) < ?`,
+    )
+    .bind(jobId, now, max)
     .run();
-  return true;
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+export async function releaseJobSlot(db: Db, jobId: string): Promise<void> {
+  await db.prepare('DELETE FROM active_jobs WHERE id = ?').bind(jobId).run();
 }
 
 export async function getLanguage(db: Db, telegramId: number, fallback: Language): Promise<Language> {
@@ -284,14 +309,22 @@ export async function countEventsSince(db: Db, event: string, since: number, pla
 }
 
 /** Cleanup run by the scheduled handler. Only short-lived tables are pruned here. */
-export async function pruneOldRows(db: Db, now: number, logRetentionDays: number): Promise<void> {
-  const logCutoff = now - logRetentionDays * 86_400_000;
+export async function pruneOldRows(
+  db: Db,
+  now: number,
+  s: Pick<Settings, 'log_retention_days' | 'language_retention_days' | 'store_language'>,
+): Promise<void> {
+  const logCutoff = now - s.log_retention_days * 86_400_000;
+  const languageCutoff = s.store_language ? now - s.language_retention_days * 86_400_000 : now + 1;
   await db.batch([
     db.prepare('DELETE FROM rate_events WHERE created_at < ?').bind(now - 3_600_000),
     db.prepare('DELETE FROM dedupe_keys WHERE created_at < ?').bind(now - 86_400_000),
     db.prepare('DELETE FROM login_attempts WHERE created_at < ?').bind(now - 86_400_000),
+    db.prepare('DELETE FROM active_jobs WHERE started_at < ?').bind(now - 3_600_000),
     db.prepare('DELETE FROM panel_sessions WHERE expires_at < ?').bind(now),
     db.prepare('DELETE FROM app_logs WHERE created_at < ?').bind(logCutoff),
+    // With store_language off, no language rows are kept (the cutoff is in the future).
+    db.prepare('DELETE FROM user_prefs WHERE updated_at < ?').bind(languageCutoff),
   ]);
 }
 

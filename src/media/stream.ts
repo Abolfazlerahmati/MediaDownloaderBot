@@ -13,8 +13,9 @@ export interface MediaStream {
   exceededLimit(): boolean;
 }
 
-export async function openMedia(videoUrl: string, referer: string, maxBytes: number): Promise<MediaStream> {
+export async function openMedia(videoUrl: string, referer: string, maxBytes: number, signal?: AbortSignal): Promise<MediaStream> {
   const res = await fetch(videoUrl, {
+    signal,
     headers: {
       'user-agent': BROWSER_USER_AGENT,
       referer,
@@ -22,6 +23,7 @@ export async function openMedia(videoUrl: string, referer: string, maxBytes: num
     },
     redirect: 'follow',
   }).catch(() => {
+    if (signal?.aborted) throw new BotError('timeout', 'media request timed out');
     throw new BotError('upstream_error', 'media request failed');
   });
   if (res.status === 401 || res.status === 403 || res.status === 429) {

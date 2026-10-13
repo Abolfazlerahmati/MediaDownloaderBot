@@ -71,7 +71,7 @@ describe('logs', () => {
     const now = Date.UTC(2026, 9, 14);
     await writeLog(t.db, now - 10 * DAY, 'info', 'old', '', '');
     await writeLog(t.db, now - 1 * DAY, 'info', 'new', '', '');
-    await pruneOldRows(t.db, now, 7);
+    await pruneOldRows(t.db, now, { log_retention_days: 7, language_retention_days: 90, store_language: true });
     const left = (t.raw.prepare('SELECT event FROM app_logs').all() as Array<{ event: string }>).map((r) => r.event);
     expect(left).toEqual(['new']);
   });

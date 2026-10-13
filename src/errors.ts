@@ -9,6 +9,7 @@ export type ErrorCode =
   | 'invalid_media' // the downloaded bytes are not an MP4 file
   | 'telegram_error' // Telegram refused the file or the request
   | 'not_implemented' // platform is listed but not implemented on Workers
+  | 'timeout' // the per-download time budget ran out (not retried)
   | 'internal';
 
 export class BotError extends Error {

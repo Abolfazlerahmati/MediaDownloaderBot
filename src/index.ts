@@ -85,7 +85,7 @@ export default {
         const now = Date.now();
         await ensureSchema(env.DB, now);
         const settings = await getSettings(env.DB);
-        await pruneOldRows(env.DB, now, settings.log_retention_days);
+        await pruneOldRows(env.DB, now, settings);
       })().catch((error: unknown) => {
         const name = error instanceof Error ? error.name : 'unknown';
         console.error(JSON.stringify({ event: 'maintenance_failed', name }));

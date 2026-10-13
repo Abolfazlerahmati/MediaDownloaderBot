@@ -21,8 +21,10 @@ function makeStmt(raw: DatabaseSync, sql: string, params: Param[]): Stmt {
     async all<T>(): Promise<{ results: T[] }> {
       return { results: raw.prepare(sql).all(...params) as T[] };
     },
-    async run(): Promise<unknown> {
-      return raw.prepare(sql).run(...params);
+    async run(): Promise<{ meta?: { changes?: number } }> {
+      // Same shape as D1: { meta: { changes } }.
+      const r = raw.prepare(sql).run(...params);
+      return { meta: { changes: Number(r.changes) } };
     },
   };
 }

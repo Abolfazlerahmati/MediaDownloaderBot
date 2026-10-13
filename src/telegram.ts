@@ -75,12 +75,23 @@ export interface InlineKeyboard {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
 }
 
-export function sendMessage(token: string, chatId: number, text: string, replyMarkup?: InlineKeyboard): Promise<unknown> {
+/** reply_parameters keeps the reply even if the original message was deleted meanwhile. */
+export function replyParameters(messageId: number | undefined): { reply_parameters: { message_id: number; allow_sending_without_reply: true } } | {} {
+  return messageId ? { reply_parameters: { message_id: messageId, allow_sending_without_reply: true } } : {};
+}
+
+export function sendMessage(
+  token: string,
+  chatId: number,
+  text: string,
+  options: { markup?: InlineKeyboard; replyTo?: number } = {},
+): Promise<unknown> {
   return callTelegram(token, 'sendMessage', {
     chat_id: chatId,
     text,
     disable_web_page_preview: true,
-    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    ...(options.markup ? { reply_markup: options.markup } : {}),
+    ...replyParameters(options.replyTo),
   });
 }
 
@@ -94,14 +105,19 @@ export async function sendVideoStream(
   chatId: number,
   file: { name: string; contentType: string; body: ReadableStream<Uint8Array> },
   caption?: string,
+  options: { replyTo?: number; signal?: AbortSignal } = {},
 ): Promise<void> {
   const fields: Record<string, string> = { chat_id: String(chatId), supports_streaming: 'true' };
   if (caption) fields.caption = caption.slice(0, 1024);
+  if (options.replyTo) {
+    fields.reply_parameters = JSON.stringify({ message_id: options.replyTo, allow_sending_without_reply: true });
+  }
   const plan = buildMultipart(fields, { fieldName: 'video', ...file });
   const res = await fetch(`${API_BASE}/bot${token}/sendVideo`, {
     method: 'POST',
     headers: { 'content-type': `multipart/form-data; boundary=${plan.boundary}` },
     body: plan.body,
+    signal: options.signal,
   }).catch(() => {
     throw new TelegramError('sendVideo', 0, 'network error');
   });

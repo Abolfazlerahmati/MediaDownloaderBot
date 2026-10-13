@@ -131,6 +131,12 @@
     max_file_mb: 'Maximum file size (MB, up to 50)',
     log_retention_days: 'Log retention (days)',
     maintenance_message: 'Maintenance message (private chats, shown when the bot is off)',
+    max_links_per_message: 'Links processed per message (1–5)',
+    max_concurrent_jobs: 'Downloads running at once, all chats (1–20)',
+    download_timeout_seconds: 'Time limit per link (seconds, 10–300)',
+    retry_attempts: 'Attempts for a transient source failure (1–3, 1 = no retry)',
+    store_language: 'Store each user\'s language choice (off = temporary, nothing saved)',
+    language_retention_days: 'Keep language choices for (days, 1–365)',
   };
   const ENUM_LABELS = {
     en: 'English',

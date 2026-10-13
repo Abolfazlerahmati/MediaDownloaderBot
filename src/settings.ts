@@ -11,6 +11,18 @@ export interface Settings {
   max_file_mb: number;
   log_retention_days: number;
   maintenance_message: string;
+  /** How many recognized links from one message are processed. The rest are skipped with a notice. */
+  max_links_per_message: number;
+  /** Downloads running at the same time across all chats (see docs/privacy.md). */
+  max_concurrent_jobs: number;
+  /** Total time budget per link: page lookup, download, and upload. */
+  download_timeout_seconds: number;
+  /** Attempts for a transient source-site failure (1 means no retry). */
+  retry_attempts: number;
+  /** When false, the bot stores no per-user language. Every user gets the default language. */
+  store_language: boolean;
+  /** Language choices are deleted this many days after they were made. */
+  language_retention_days: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -22,6 +34,12 @@ export const DEFAULT_SETTINGS: Settings = {
   max_file_mb: 50,
   log_retention_days: 7,
   maintenance_message: '',
+  max_links_per_message: 3,
+  max_concurrent_jobs: 5,
+  download_timeout_seconds: 90,
+  retry_attempts: 2,
+  store_language: true,
+  language_retention_days: 90,
 };
 
 type Def =
@@ -39,6 +57,12 @@ export const SETTING_DEFS: { [K in keyof Settings]: Def } = {
   max_file_mb: { type: 'int', min: 1, max: 50 },
   log_retention_days: { type: 'int', min: 1, max: 90 },
   maintenance_message: { type: 'text', maxLength: 300 },
+  max_links_per_message: { type: 'int', min: 1, max: 5 },
+  max_concurrent_jobs: { type: 'int', min: 1, max: 20 },
+  download_timeout_seconds: { type: 'int', min: 10, max: 300 },
+  retry_attempts: { type: 'int', min: 1, max: 3 },
+  store_language: { type: 'bool' },
+  language_retention_days: { type: 'int', min: 1, max: 365 },
 };
 
 export type FieldErrors = Record<string, string>;

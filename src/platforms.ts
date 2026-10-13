@@ -22,6 +22,13 @@ export function extractFirstUrl(text: string): string | null {
   return match[0].replace(/[.,;:!?)\]]+$/, '');
 }
 
+/** Returns every http(s) URL in a message, in order, without duplicates. */
+export function extractUrls(text: string): string[] {
+  const found = text.match(/https?:\/\/[^\s<>"']+/gi) ?? [];
+  const cleaned = found.map((u) => u.replace(/[.,;:!?)\]]+$/, ''));
+  return [...new Set(cleaned)];
+}
+
 export function classifyUrl(raw: string): ClassifiedUrl | null {
   let parsed: URL;
   try {

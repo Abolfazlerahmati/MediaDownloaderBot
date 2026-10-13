@@ -30,9 +30,10 @@ export function youtubeVideoId(pageUrl: string): string | null {
   return id && ID_RE.test(id) ? id : null;
 }
 
-export async function postPlayer(videoId: string): Promise<unknown> {
+export async function postPlayer(videoId: string, signal?: AbortSignal): Promise<unknown> {
   const res = await fetch(PLAYER_ENDPOINT, {
     method: 'POST',
+    signal,
     headers: {
       'content-type': 'application/json',
       'user-agent': YOUTUBE_CLIENT_UA,
@@ -48,6 +49,7 @@ export async function postPlayer(videoId: string): Promise<unknown> {
       racyCheckOk: true,
     }),
   }).catch(() => {
+    if (signal?.aborted) throw new BotError('timeout', 'youtube request timed out');
     throw new BotError('upstream_error', 'youtube player request failed');
   });
   if (res.status === 403 || res.status === 429) throw new BotError('blocked', `youtube status ${res.status}`);
