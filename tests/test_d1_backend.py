@@ -179,3 +179,26 @@ def test_d1_configuration_rules(tmp_path):
     assert AppConfig(**base, db_bridge_url=BRIDGE_URL, db_bridge_token=TOKEN).validation_problems() == []
     assert AppConfig(**base, db_bridge_url="http://127.0.0.1:8787/internal/db",
                      db_bridge_token=TOKEN).validation_problems() == []
+
+
+
+def test_check_command_describes_d1_not_a_local_file(tmp_path, capsys, monkeypatch, bridge):
+    """`check` must report the real backend. A D1 deployment has no local database file to point at."""
+    import sys
+
+    from mediabot import cli
+
+    monkeypatch.setenv("APP_SECRET_KEY", TEST_SECRET)
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("DB_BACKEND", "d1")
+    monkeypatch.setenv("DB_BRIDGE_URL", BRIDGE_URL)
+    monkeypatch.setenv("DB_BRIDGE_TOKEN", TOKEN)
+    monkeypatch.setattr(cli, "open_database",
+                        lambda config: D1Database(BRIDGE_URL, TOKEN, transport=httpx.MockTransport(bridge.handle)))
+    monkeypatch.setattr(sys, "argv", ["mediabot", "check"])
+    cli.main()
+    out = capsys.readouterr().out
+    database_line = next(line for line in out.splitlines() if line.startswith("database"))
+    assert "Cloudflare D1 via Worker bridge" in database_line
+    assert str(tmp_path) not in database_line
+    assert "schema 1" in database_line
