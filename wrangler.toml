@@ -1,35 +1,20 @@
-# Cloudflare Workers + Containers configuration for MediaDownloaderBot.
-# The Worker in src/index.ts routes every request to ONE container (the Dockerfile at the repo root).
-# Secrets are NOT stored here. The only secret is APP_SECRET_KEY (Workers Builds: Variables and Secrets).
-# The bot token is NOT a deploy-time setting: enter it in the admin panel after the first sign-in.
+# MediaDownloaderBot on Cloudflare Workers (free plan: no Containers, no Durable Objects).
+# Secrets are NOT stored here. Set them with `wrangler secret put` or in Workers Builds
+# (Settings > Variables and Secrets), never in this file:
+#   BOT_TOKEN       Telegram bot token from @BotFather
+#   WEBHOOK_SECRET  any random string (>= 32 chars); Telegram echoes it in each webhook call
 name = 'mediadownloaderbot'
 main = "src/index.ts"
 compatibility_date = "2026-10-13"
 
-[[containers]]
-class_name = "MediaBotContainer"
-image = "./Dockerfile"
-# standard-1 = 1/2 vCPU, 4 GiB RAM, 8 GB disk. "lite" (256 MiB) is too small for yt-dlp and ffmpeg.
-instance_type = "standard-1"
-# MUST stay 1: job queue, rate limits and the Telegram webhook state live in this one process's memory.
-max_instances = 1
-
-# Cloudflare D1 database used by the bot (see docs/cloudflare.md). The name must match the existing database.
+# Cloudflare D1 database. The name and id must match the existing database.
 [[d1_databases]]
 binding = "DB"
 database_name = "mediabot"
 database_id = "cb32937c-110c-4621-a236-0f7f6a8b7b2f"
 
-# KV namespace bound as CACHE. The application does not use it; it is declared because the Workers Builds
-# build command in docs/cloudflare.md rewrites its id. Keep the `id` line directly under `binding`.
+# KV namespace bound as CACHE. The application does not use it yet. It is declared because the
+# Workers Builds build command rewrites its id. Keep the `id` line directly under `binding`.
 [[kv_namespaces]]
 binding = "CACHE"
 id = "c22c95c3c6ae40a88fbcd4d52c8a5471"
-
-[[durable_objects.bindings]]
-class_name = "MediaBotContainer"
-name = "MEDIA_BOT"
-
-[exports.MediaBotContainer]
-type = "durable-object"
-storage = "sqlite"
