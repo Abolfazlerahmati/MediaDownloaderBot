@@ -133,6 +133,44 @@ describe('YouTube', () => {
   });
 });
 
+describe('YouTube player client fallback', () => {
+  const OK = { playabilityStatus: { status: 'OK' }, streamingData: { formats: [{ mimeType: 'video/mp4', url: 'https://r.googlevideo.com/ok' }] } };
+  const URL_OK = 'https://youtu.be/dQw4w9WgXcQ';
+
+  it('moves to the next client when the first one requires login', async () => {
+    const seen: string[] = [];
+    const info = await resolveYouTube(URL_OK, async (_id, client) => {
+      seen.push(client.name);
+      return client.name === 'ANDROID' ? { playabilityStatus: { status: 'LOGIN_REQUIRED' } } : OK;
+    });
+    expect(seen).toEqual(['ANDROID', 'IOS']);
+    expect(info.videoUrl).toBe('https://r.googlevideo.com/ok');
+  });
+
+  it('stops at once on a timeout or upstream error', async () => {
+    const seen: string[] = [];
+    await expect(
+      resolveYouTube(URL_OK, async (_id, client) => {
+        seen.push(client.name);
+        throw new BotError('timeout', 'youtube request timed out');
+      }),
+    ).rejects.toMatchObject({ code: 'timeout' });
+    expect(seen).toEqual(['ANDROID']);
+  });
+
+  it('reports the last refusal when every client is refused', async () => {
+    await expect(
+      resolveYouTube(URL_OK, async () => ({ playabilityStatus: { status: 'LOGIN_REQUIRED' } })),
+    ).rejects.toMatchObject({ code: 'blocked', message: 'youtube playability LOGIN_REQUIRED' });
+  });
+
+  it('has the Android client first, as before', async () => {
+    const { PLAYER_CLIENTS } = await import('../src/extractors/youtube');
+    expect(PLAYER_CLIENTS[0].name).toBe('ANDROID');
+    expect(PLAYER_CLIENTS.map((c) => c.name)).toEqual(['ANDROID', 'IOS', 'TVHTML5_SIMPLY_EMBEDDED_PLAYER']);
+  });
+});
+
 describe('Instagram', () => {
   it('builds the embed URL for posts, reels, and TV links only', () => {
     expect(instagramEmbedUrl('https://www.instagram.com/p/CabcdeF_12/')).toBe('https://www.instagram.com/p/CabcdeF_12/embed/captioned/');

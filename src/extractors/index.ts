@@ -2,7 +2,7 @@ import { BotError } from '../errors';
 import { extractPinterest } from './pinterest';
 import { fetchPage } from './page';
 import { extractTikTok } from './tiktok';
-import { resolveYouTube, postPlayer } from './youtube';
+import { resolveYouTube, type PlayerClient } from './youtube';
 import { resolveInstagram } from './instagram';
 import type { MediaInfo, Platform } from './types';
 
@@ -10,7 +10,7 @@ export type { MediaInfo, Platform } from './types';
 
 export interface ExtractorIO {
   page?: (url: string) => Promise<{ html: string; finalUrl: string }>;
-  youtubePlayer?: (videoId: string) => Promise<unknown>;
+  youtubePlayer?: (videoId: string, client: PlayerClient) => Promise<unknown>;
 }
 
 /**
@@ -29,7 +29,7 @@ export async function resolveMedia(platform: Platform, pageUrl: string, io: Extr
       return extractTikTok(html, finalUrl);
     }
     case 'youtube':
-      return resolveYouTube(pageUrl, io.youtubePlayer ?? postPlayer);
+      return resolveYouTube(pageUrl, io.youtubePlayer);
     case 'instagram':
       return resolveInstagram(pageUrl, page);
     default:

@@ -70,7 +70,7 @@ export function productionBotDeps(env: Env, db: Db): BotDeps {
     resolve: (info, signal) =>
       resolveMedia(info.platform, info.url, {
         page: (url) => fetchPage(url, signal),
-        youtubePlayer: (videoId) => postPlayer(videoId, signal),
+        youtubePlayer: (videoId, client) => postPlayer(videoId, client, signal),
       }),
     open: (info, maxBytes, signal) => openMedia(info.videoUrl, info.referer, maxBytes, signal),
     sendVideo: async (chatId, media: MediaStream, info, job) => {
