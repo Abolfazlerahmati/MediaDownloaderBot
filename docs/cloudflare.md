@@ -78,6 +78,12 @@ If you create, change, or remove `WEBHOOK_SECRET`, press **Register webhook** ag
 | Cron triggers | 5 | One hourly maintenance trigger |
 | Telegram upload | 50 MB via the public Bot API | Files over the cap return a clear error |
 
+## After each update (GitHub push)
+- Every update is deployed to the same Worker, `mediadownloaderbot`. Its secrets stay in place.
+- Open **Diagnostics**: **Running version** and **Uploaded** show which version is serving now. If they do not match the latest commit, the build did not reach this Worker.
+- Open **Bot and health**: the **Webhook address** (expected) and **Telegram webhook URL** (what Telegram has) must match. If they differ, press **Register webhook**.
+- If **BOT_TOKEN** shows Missing after an update, the secret is not on this Worker. Add it again in Settings > Variables and secrets, then press **Register webhook**.
+
 ## Troubleshooting
 - **Panel says the database is not ready (503):** check the D1 binding `DB` in Settings > Bindings. It must point to `mediabot`.
 - **Bot username is empty, or Test connection fails:** `BOT_TOKEN` is missing or wrong. Fix it in step 3.

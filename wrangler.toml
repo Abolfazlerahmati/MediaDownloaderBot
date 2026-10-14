@@ -18,6 +18,10 @@ database_id = "cb32937c-110c-4621-a236-0f7f6a8b7b2f"
 binding = "CACHE"
 id = "c22c95c3c6ae40a88fbcd4d52c8a5471"
 
+# Gives the running Worker's version id and upload time to the panel (Diagnostics), so an update can be checked.
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
 # Static files for the admin panel (public/static/app.css and app.js).
 [assets]
 directory = "./public"

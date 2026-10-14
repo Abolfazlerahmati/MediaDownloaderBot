@@ -672,6 +672,7 @@
           ['Bot username', d.bot_username ? '@' + d.bot_username : '—'],
           ['Bot is on', d.bot_enabled ? badge('Yes', 'ok') : badge('Paused in Settings', 'warn')],
           ['Webhook address', h('span', { class: 'mono', text: d.expected_webhook_url })],
+          ['Telegram webhook URL', h('span', { class: 'mono', text: wh && wh.url ? wh.url : '—' })],
           ['Webhook status', !d.webhook_registered ? badge('Not registered', 'warn') : d.secret_matches ? badge('Registered', 'ok') : badge('Register again', 'warn')],
           ['Pending updates', wh ? String(wh.pending_update_count ?? 0) : '—'],
           ['Last Telegram error', wh && wh.last_error_message ? wh.last_error_message : '—'],
@@ -800,6 +801,8 @@
           ['App version', rest.app_version],
           ['Runtime', rest.runtime],
           ['Database schema', rest.schema_version],
+          ['Running version', rest.running_version && rest.running_version.id ? String(rest.running_version.id).slice(0, 8) : '—'],
+          ['Uploaded', rest.running_version && rest.running_version.uploaded_at ? rest.running_version.uploaded_at : '—'],
         ])),
         section('Secrets', 'Set these in Cloudflare Secrets.', kvList([
           ['BOT_TOKEN', secretKind(rest.secrets.BOT_TOKEN)],

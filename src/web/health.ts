@@ -108,6 +108,10 @@ export async function diagnostics(ctx: HealthContext): Promise<Record<string, un
   return {
     app_version: '2.0.0',
     runtime: 'cloudflare-workers',
+    running_version: {
+      id: env.CF_VERSION_METADATA?.id ?? null,
+      uploaded_at: env.CF_VERSION_METADATA?.timestamp ?? null,
+    },
     schema_version: await schemaVersion(db),
     secrets: {
       BOT_TOKEN: requireToken(env) ? 'set' : 'missing',

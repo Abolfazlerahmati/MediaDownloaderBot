@@ -200,5 +200,8 @@
  "The webhook was not registered with the current WEBHOOK_SECRET.",
  "Telegram may hold a missing or older secret, so updates are rejected with 403. Press Register webhook below once.",
  "Register again",
- "Error codes and the source status only. No links or user IDs."
+ "Error codes and the source status only. No links or user IDs.",
+ "Running version",
+ "Uploaded",
+ "Telegram webhook URL"
 ]
