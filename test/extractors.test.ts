@@ -161,7 +161,18 @@ describe('YouTube player client fallback', () => {
   it('reports the last refusal when every client is refused', async () => {
     await expect(
       resolveYouTube(URL_OK, async () => ({ playabilityStatus: { status: 'LOGIN_REQUIRED' } })),
-    ).rejects.toMatchObject({ code: 'blocked', message: 'youtube playability LOGIN_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'blocked', message: 'youtube playability LOGIN_REQUIRED, LOGIN_REQUIRED, LOGIN_REQUIRED' });
+  });
+
+  it('lists what each client said, in order', async () => {
+    const answers: Record<string, unknown> = {
+      ANDROID: { playabilityStatus: { status: 'LOGIN_REQUIRED' } },
+      IOS: { playabilityStatus: { status: 'ERROR' } },
+      TVHTML5_SIMPLY_EMBEDDED_PLAYER: { playabilityStatus: { status: 'ERROR' } },
+    };
+    await expect(
+      resolveYouTube(URL_OK, async (_id, client) => answers[client.name]),
+    ).rejects.toMatchObject({ code: 'no_media', message: 'youtube playability LOGIN_REQUIRED, ERROR, ERROR' });
   });
 
   it('has the Android client first, as before', async () => {

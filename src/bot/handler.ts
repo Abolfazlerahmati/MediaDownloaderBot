@@ -181,7 +181,7 @@ async function runJob(
 }
 
 /** Only fixed shapes such as "youtube status 403" or "youtube playability LOGIN_REQUIRED" are logged. Anything else is dropped. */
-const SAFE_REASON = /^[a-z][a-z ]{0,40} (?:status \d{3}|playability [A-Z_]{1,40})$/;
+const SAFE_REASON = /^[a-z][a-z ]{0,40} (?:status \d{3}|playability [A-Z][A-Z0-9_]{0,40}(?:, [A-Z][A-Z0-9_]{0,40}){0,4})$/;
 
 /** Adds the source's own status to the log detail, for example "blocked · youtube playability LOGIN_REQUIRED". */
 function withReason(code: ErrorCode, error: unknown): string {

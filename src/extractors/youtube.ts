@@ -138,14 +138,27 @@ export async function resolveYouTube(
 ): Promise<MediaInfo> {
   const id = youtubeVideoId(pageUrl);
   if (!id) throw new BotError('not_found', 'youtube: no video id in link');
-  let lastError: BotError | null = null;
+  const reasons: string[] = [];
+  let lastCode: 'blocked' | 'no_media' = 'blocked';
   for (const client of PLAYER_CLIENTS) {
     try {
       return extractYouTube(await player(id, client));
     } catch (error) {
       if (!(error instanceof BotError) || (error.code !== 'blocked' && error.code !== 'no_media')) throw error;
-      lastError = error;
+      reasons.push(shortReason(error.message));
+      lastCode = error.code;
     }
   }
-  throw lastError ?? new BotError('blocked', 'youtube: no client accepted the request');
+  // One entry per client, in order, so the log shows what each client said. Only fixed status names are used.
+  throw new BotError(lastCode, `youtube playability ${reasons.join(', ')}`);
+}
+
+/** Maps a client's failure to a fixed token: a YouTube status name, an HTTP status, or NO_MP4. */
+export function shortReason(message: string): string {
+  const playability = message.match(/playability ([A-Z_]+)/);
+  if (playability) return playability[1];
+  const status = message.match(/status (\d{3})/);
+  if (status) return `HTTP_${status[1]}`;
+  if (message.includes('no progressive mp4')) return 'NO_MP4';
+  return 'OTHER';
 }

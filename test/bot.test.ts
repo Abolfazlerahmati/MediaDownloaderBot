@@ -286,6 +286,12 @@ describe('retries, timeouts, and errors', () => {
     expect(f.logs.find((l) => l.event === 'download_failed')?.detail).toBe('blocked · youtube playability LOGIN_REQUIRED');
   });
 
+  it('logs the reason of each YouTube client in order', async () => {
+    const f = fake({}, { resolve: async () => { throw new BotError('no_media', 'youtube playability LOGIN_REQUIRED, HTTP_403, ERROR'); } });
+    await handleUpdate(privateMsg(TT(1)), f.deps);
+    expect(f.logs.find((l) => l.event === 'download_failed')?.detail).toBe('no_media · youtube playability LOGIN_REQUIRED, HTTP_403, ERROR');
+  });
+
   it('adds an HTTP status but drops free text that could contain a link', async () => {
     const f = fake({}, { resolve: async () => { throw new BotError('blocked', 'youtube status 403'); } });
     await handleUpdate(privateMsg(TT(1)), f.deps);
