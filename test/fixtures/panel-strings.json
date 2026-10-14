@@ -110,7 +110,6 @@
  "Older choices are deleted by the hourly cleanup. Range: 1–365.",
  "Older log entries are deleted by the hourly cleanup. Range: 1–90.",
  "On",
- "Only error codes are shown. No links or user IDs.",
  "Only when addressed",
  "Open Bot and health",
  "Operations",
@@ -200,5 +199,6 @@
  "Register points Telegram at this Worker and sends the WEBHOOK_SECRET value with it. Press it once after you create or change WEBHOOK_SECRET. Telegram sends updates only after this.",
  "The webhook was not registered with the current WEBHOOK_SECRET.",
  "Telegram may hold a missing or older secret, so updates are rejected with 403. Press Register webhook below once.",
- "Register again"
+ "Register again",
+ "Error codes and the source status only. No links or user IDs."
 ]

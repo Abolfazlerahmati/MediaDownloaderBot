@@ -280,7 +280,7 @@
           h('thead', {}, h('tr', {}, h('th', { text: 'Platform' }), h('th', { text: 'Status' }), h('th', { text: 'Last test' }))),
           h('tbody', {}, platformRows),
         ))),
-        section('Recent failures', 'Only error codes are shown. No links or user IDs.', d.recent_errors && d.recent_errors.length
+        section('Recent failures', 'Error codes and the source status only. No links or user IDs.', d.recent_errors && d.recent_errors.length
           ? h('div', { class: 'table-wrap' }, h('table', { class: 'table' },
               h('thead', {}, h('tr', {}, h('th', { text: 'When' }), h('th', { text: 'Platform' }), h('th', { text: 'Reason' }))),
               h('tbody', {}, errorRows),

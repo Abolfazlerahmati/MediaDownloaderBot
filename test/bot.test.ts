@@ -280,6 +280,21 @@ describe('retries, timeouts, and errors', () => {
     expect(f.logs.find((l) => l.event === 'download_failed')?.detail).toBe('timeout');
   });
 
+  it('adds the source status to the log for a YouTube block, without any link', async () => {
+    const f = fake({}, { resolve: async () => { throw new BotError('blocked', 'youtube playability LOGIN_REQUIRED'); } });
+    await handleUpdate(privateMsg(TT(1)), f.deps);
+    expect(f.logs.find((l) => l.event === 'download_failed')?.detail).toBe('blocked · youtube playability LOGIN_REQUIRED');
+  });
+
+  it('adds an HTTP status but drops free text that could contain a link', async () => {
+    const f = fake({}, { resolve: async () => { throw new BotError('blocked', 'youtube status 403'); } });
+    await handleUpdate(privateMsg(TT(1)), f.deps);
+    expect(f.logs.find((l) => l.event === 'download_failed')?.detail).toBe('blocked · youtube status 403');
+    const g = fake({}, { open: async () => { throw new BotError('blocked', 'see https://x.example/?t=1'); } });
+    await handleUpdate(privateMsg(TT(1)), g.deps);
+    expect(g.logs.find((l) => l.event === 'download_failed')?.detail).toBe('blocked');
+  });
+
   it('logs only the error code, never the detail or URL', async () => {
     const f = fake({}, { open: async () => { throw new BotError('file_too_large', 'declared 90000000 bytes https://secret.example/?token=abc'); } });
     await handleUpdate(privateMsg(TT(1)), f.deps);

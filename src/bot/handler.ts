@@ -175,9 +175,18 @@ async function runJob(
     await deps.log('info', 'download_ok', classified.platform, '');
   } catch (error) {
     const code = codeOf(error, media, signal);
-    await deps.log('error', 'download_failed', classified.platform, code);
+    await deps.log('error', 'download_failed', classified.platform, withReason(code, error));
     await reply(errorKey(code) as MessageKey).catch(() => deps.log('warning', 'send_failed', classified.platform, 'error_message'));
   }
+}
+
+/** Only fixed shapes such as "youtube status 403" or "youtube playability LOGIN_REQUIRED" are logged. Anything else is dropped. */
+const SAFE_REASON = /^[a-z][a-z ]{0,40} (?:status \d{3}|playability [A-Z_]{1,40})$/;
+
+/** Adds the source's own status to the log detail, for example "blocked · youtube playability LOGIN_REQUIRED". */
+function withReason(code: ErrorCode, error: unknown): string {
+  if (!(error instanceof BotError)) return code;
+  return SAFE_REASON.test(error.message) ? `${code} · ${error.message}` : code;
 }
 
 function codeOf(error: unknown, media: MediaStream | null, signal: AbortSignal): ErrorCode {

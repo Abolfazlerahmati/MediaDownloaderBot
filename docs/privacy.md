@@ -22,7 +22,7 @@ This describes what the bot and the panel store, how long, and why. It matches t
 
 - Message text, downloaded files, and the full link of any download. Links are hashed for dedupe.
 - Usernames, names, and phone numbers from Telegram.
-- Logs never contain tokens, full links, user IDs, or message text. The detail field holds only an error code.
+- Logs never contain tokens, full links, user IDs, or message text. The detail field holds an error code and, when the source site gave one, its HTTP status or a short status name such as `LOGIN_REQUIRED`.
 - The bot token and the webhook secret are Cloudflare Secrets. They are not in the code, the database, or the logs.
 
 ## Why IDs are hashed

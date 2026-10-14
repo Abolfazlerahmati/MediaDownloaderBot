@@ -121,7 +121,7 @@
     'On': 'روشن',
     'Older choices are deleted by the hourly cleanup. Range: 1–365.': 'انتخاب‌های قدیمی‌تر در پاکسازی ساعتی حذف می‌شوند. بازه: 1–365.',
     'Older log entries are deleted by the hourly cleanup. Range: 1–90.': 'گزارش‌های قدیمی‌تر در پاکسازی ساعتی حذف می‌شوند. بازه: 1–90.',
-    'Only error codes are shown. No links or user IDs.': 'فقط کدهای خطا نشان داده می‌شود. نه لینک، نه شناسه‌ی کاربر.',
+    'Error codes and the source status only. No links or user IDs.': 'فقط کد خطا و وضعیت سایت منبع نشان داده می‌شود. نه لینک، نه شناسه‌ی کاربر.',
     'Only when addressed': 'فقط وقتی خطاب شود',
     'Open Bot and health': 'باز کردن ربات و سلامت',
     'Operations': 'عملیات',
