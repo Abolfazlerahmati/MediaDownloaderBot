@@ -19,7 +19,11 @@ export async function handleWebhook(request: Request, env: Env, ctx: ExecutionCo
     return reply(500, { ok: false, error: 'server_not_configured' });
   }
   const provided = request.headers.get(SECRET_HEADER) ?? '';
-  if (!constantTimeEqual(provided, env.WEBHOOK_SECRET)) return reply(403, { ok: false, error: 'forbidden' });
+  if (!constantTimeEqual(provided, env.WEBHOOK_SECRET)) {
+    // Logged without the header value or the secret. A missing header usually means the webhook was registered before the secret was set.
+    console.error(JSON.stringify({ event: 'webhook_rejected', reason: provided ? 'secret_mismatch' : 'secret_header_missing' }));
+    return reply(403, { ok: false, error: 'forbidden' });
+  }
 
   const declared = Number(request.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > MAX_WEBHOOK_BYTES) return reply(413, { ok: false, error: 'payload_too_large' });

@@ -34,7 +34,16 @@ import { DEFAULT_SETTINGS, SETTING_DEFS, validateChanges } from '../settings';
 import { BodyError, apiError, json, readJson, sessionClearCookie, sessionSetCookie } from './http';
 import { createSession, currentAuth, csrfMatches, originMatches, type AuthContext } from './session';
 import { passwordProblem } from './password-policy';
-import { getBotUsername, requireToken, siteOrigin, webhookSecretProblem, webhookUrlFor } from './bot-admin';
+import {
+  getBotUsername,
+  registeredSecretMatches,
+  requireToken,
+  secretFingerprint,
+  SECRET_FINGERPRINT_KEY,
+  siteOrigin,
+  webhookSecretProblem,
+  webhookUrlFor,
+} from './bot-admin';
 import { checkHealth, diagnostics } from './health';
 
 export interface ApiContext {
@@ -175,6 +184,7 @@ async function route(ctx: ApiContext, auth: AuthContext, method: string, path: s
     const target = webhookUrlFor(siteOrigin(request));
     try {
       await setWebhook(token, target, env.WEBHOOK_SECRET);
+      await setState(db, SECRET_FINGERPRINT_KEY, await secretFingerprint(env.WEBHOOK_SECRET), now);
       await writeLog(db, now, 'info', 'webhook_registered', '', 'ok');
       return json({ ok: true, url: target });
     } catch (error) {
@@ -187,6 +197,7 @@ async function route(ctx: ApiContext, auth: AuthContext, method: string, path: s
     if (!token) return tokenMissing();
     try {
       await deleteWebhook(token);
+      await setState(db, SECRET_FINGERPRINT_KEY, '', now);
       await writeLog(db, now, 'info', 'webhook_removed', '', 'ok');
       return json({ ok: true });
     } catch (error) {
@@ -364,6 +375,7 @@ async function botStatus(ctx: ApiContext): Promise<Response> {
     expected_webhook_url: expected,
     webhook: info,
     webhook_registered: !!info && info.url === expected,
+    secret_matches: await registeredSecretMatches(db, env.WEBHOOK_SECRET),
     error,
   });
 }

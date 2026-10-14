@@ -2,8 +2,27 @@
 import type { Db } from '../db/schema';
 import { getState, setState } from '../db/store';
 import { getMe } from '../telegram';
+import { sha256Hex } from '../security/crypto';
 
 export const WEBHOOK_PATH = '/telegram/webhook';
+
+/** bot_state key holding a hash of the WEBHOOK_SECRET that was sent to Telegram at the last registration. */
+export const SECRET_FINGERPRINT_KEY = 'webhook_secret_fingerprint';
+
+/** Hash of the secret, never the secret itself. Used only to notice when WEBHOOK_SECRET changed after registration. */
+export function secretFingerprint(secret: string): Promise<string> {
+  return sha256Hex(`mb-webhook-secret:${secret}`);
+}
+
+/**
+ * True when the secret in Cloudflare is the one registered with Telegram.
+ * Returns false when nothing was registered by this version yet, so the panel asks for one registration.
+ */
+export async function registeredSecretMatches(db: Db, secret: string | undefined): Promise<boolean> {
+  if (!secret) return false;
+  const stored = await getState(db, SECRET_FINGERPRINT_KEY);
+  return !!stored && stored === (await secretFingerprint(secret));
+}
 
 /** Origin of the Worker as seen by the browser, for example https://mediadownloaderbot.example.workers.dev. */
 export function siteOrigin(request: Request): string {

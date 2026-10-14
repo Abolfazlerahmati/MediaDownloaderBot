@@ -614,6 +614,8 @@
       { class: 'card platform-card', 'aria-labelledby': 'p-' + p.key },
       h('div', { class: 'card-head' },
         h('h2', { id: 'p-' + p.key, text: p.name }),
+      ),
+      h('div', { class: 'badge-row' },
         p.implemented ? badge('Extractor ready', 'ok') : badge('No extractor in this version', 'warn'),
         badge(p.enabled ? 'On' : 'Off', p.enabled ? 'ok' : 'muted'),
       ),
@@ -661,13 +663,16 @@
         ? notice('err', 'The bot token is not set.', 'Add BOT_TOKEN as a Secret in Cloudflare (Workers & Pages → mediadownloaderbot → Settings → Variables and secrets, type Secret), then reload this page.')
         : null,
       d.error ? notice('err', 'Telegram did not answer.', d.error) : null,
+      d.webhook_registered && !d.secret_matches
+        ? notice('err', 'The webhook was not registered with the current WEBHOOK_SECRET.', 'Telegram may hold a missing or older secret, so updates are rejected with 403. Press Register webhook below once.')
+        : null,
       h('div', { class: 'two-col' },
         section('Telegram bot', null, kvList([
           ['Bot token', d.token_configured ? badge('Set in Cloudflare Secrets', 'ok') : badge('Missing', 'err')],
           ['Bot username', d.bot_username ? '@' + d.bot_username : '—'],
           ['Bot is on', d.bot_enabled ? badge('Yes', 'ok') : badge('Paused in Settings', 'warn')],
           ['Webhook address', h('span', { class: 'mono', text: d.expected_webhook_url })],
-          ['Webhook status', d.webhook_registered ? badge('Registered', 'ok') : badge('Not registered', 'warn')],
+          ['Webhook status', !d.webhook_registered ? badge('Not registered', 'warn') : d.secret_matches ? badge('Registered', 'ok') : badge('Register again', 'warn')],
           ['Pending updates', wh ? String(wh.pending_update_count ?? 0) : '—'],
           ['Last Telegram error', wh && wh.last_error_message ? wh.last_error_message : '—'],
         ])),
@@ -675,7 +680,7 @@
           h('p', { class: 'muted', text: 'The token is read-only here. To change it, edit BOT_TOKEN in Cloudflare Secrets, then run Test connection and Register webhook.' }),
           h('p', { class: 'muted', text: 'Test connection calls Telegram getMe with the saved token.' }),
           actionBtn('Test connection', 'POST', '/api/bot/test', (x) => `Connected as @${x.username || 'unknown'}.`),
-          h('p', { class: 'muted', text: 'Register points Telegram at this Worker. Telegram sends updates only after this.' }),
+          h('p', { class: 'muted', text: 'Register points Telegram at this Worker and sends the WEBHOOK_SECRET value with it. Press it once after you create or change WEBHOOK_SECRET. Telegram sends updates only after this.' }),
           actionBtn('Register webhook', 'POST', '/api/bot/webhook', () => 'Webhook registered.'),
           h('p', { class: 'muted', text: 'Removing the webhook stops the bot from receiving messages.' }),
           actionBtn('Remove webhook', 'DELETE', '/api/bot/webhook', () => 'Webhook removed.', { danger: true, confirmText: 'The bot will stop receiving messages until you register the webhook again.' }),
@@ -736,7 +741,7 @@
       for (const row of res.data.items) {
         const [label, kind] = SEV[row.severity] || [row.severity, 'muted'];
         tbody.append(h('tr', {},
-          h('td', { class: 'num' }, h('time', { datetime: new Date(row.created_at).toISOString(), title: fmtDate(row.created_at), text: fmtRel(row.created_at) })),
+          h('td', {}, h('time', { datetime: new Date(row.created_at).toISOString(), title: fmtDate(row.created_at), text: fmtRel(row.created_at) })),
           h('td', {}, badge(label, kind)),
           h('td', { class: 'mono', text: row.event }),
           h('td', { text: row.platform || '—' }),

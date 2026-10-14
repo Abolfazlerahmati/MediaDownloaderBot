@@ -56,7 +56,7 @@ The panel uses `BOT_TOKEN` and `WEBHOOK_SECRET` from step 3, and registers
 `https://<your Worker URL>/telegram/webhook`. Check the status on the same page: the username, pending updates, and the last
 Telegram error. Run **Test connection** to verify the token.
 
-If you change the Worker URL or the secret, press **Register webhook** again.
+If you create, change, or remove `WEBHOOK_SECRET`, press **Register webhook** again. Telegram keeps the secret it was given at the last registration. The panel shows **Register again** and a warning when the current secret does not match that registration.
 
 ## 7. Settings, platforms, and the bot
 - **Settings:** bot on/off, default language, group behaviour, rate limit (per user per minute), duplicate window,
@@ -81,7 +81,7 @@ If you change the Worker URL or the secret, press **Register webhook** again.
 ## Troubleshooting
 - **Panel says the database is not ready (503):** check the D1 binding `DB` in Settings > Bindings. It must point to `mediabot`.
 - **Bot username is empty, or Test connection fails:** `BOT_TOKEN` is missing or wrong. Fix it in step 3.
-- **Webhook shows a last error:** press **Register webhook** again. A 403 from Telegram's side means the secret does not match.
+- **Webhook shows 403 Forbidden:** the secret Telegram holds does not match `WEBHOOK_SECRET`. Create or edit the secret in Cloudflare, deploy or wait for the change to apply, then press **Register webhook**. Workers logs show `webhook_rejected` with `secret_header_missing` (no secret was sent, usually registered before the secret existed) or `secret_mismatch`.
 - **500 `server_not_configured` in the logs:** `BOT_TOKEN` or `WEBHOOK_SECRET` is missing.
 - **Build fails on GitHub:** open the build log in Workers & Pages > mediadownloaderbot > Deployments.
 - **The panel shows old text after an update:** reload with Ctrl+Shift+R.
