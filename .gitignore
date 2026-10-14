@@ -1,0 +1,14 @@
+# Node / Workers
+node_modules/
+.wrangler/
+coverage/
+# Secrets (never commit)
+.dev.vars
+.env
+.env.*
+!.env.example
+!.dev.vars.example
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
